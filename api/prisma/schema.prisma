@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  status        String    @default("active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  userRoles         UserRole[]
+  tasks             Task[]
+  nodeInstances     NodeInstance[]
+  processInstances  ProcessInstance[]
+  processDefinitions ProcessDefinition[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions Json     @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  userRoles     UserRole[]
+  nodeInstances NodeInstance[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  scopeType String   @default("global") @map("scope_type")
+  scopeId   String?  @map("scope_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, scopeType, scopeId])
+  @@map("user_roles")
+}
+
+model ProcessDefinition {
+  id          String   @id @default(uuid())
+  name        String
+  version     Int      @default(1)
+  graphJson   Json     @map("graph_json")
+  status      String   @default("draft")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  creator         User?               @relation(fields: [createdBy], references: [id])
+  nodes           NodeDefinition[]
+  processInstances ProcessInstance[]
+
+  @@unique([name, version])
+  @@map("process_definitions")
+}
+
+model NodeDefinition {
+  id              String   @id @default(uuid())
+  processId       String   @map("process_id")
+  nodeName        String   @map("node_name")
+  nodeType        String   @default("task") @map("node_type")
+  inputSpec       Json     @map("input_spec")
+  actionSpec      Json     @map("action_spec")
+  outputSpec      Json     @map("output_spec")
+  aiConfig        Json     @map("ai_config")
+  progressConfig  Json     @map("progress_config")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  process       ProcessDefinition @relation(fields: [processId], references: [id], onDelete: Cascade)
+  nodeInstances NodeInstance[]
+
+  @@map("node_definitions")
+}
+
+model ProcessInstance {
+  id              String    @id @default(uuid())
+  definitionId    String    @map("definition_id")
+  status          String    @default("running")
+  plannedStartDate DateTime? @map("planned_start_date")
+  actualStartDate DateTime? @map("actual_start_date")
+  currentNodeId   String?   @map("current_node_id")
+  createdBy       String    @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  definition    ProcessDefinition @relation(fields: [definitionId], references: [id])
+  creator       User              @relation(fields: [createdBy], references: [id])
+  nodeInstances NodeInstance[]
+
+  @@map("process_instances")
+}
+
+model NodeInstance {
+  id                String    @id @default(uuid())
+  instanceId        String    @map("instance_id")
+  definitionId      String    @map("definition_id")
+  status            String    @default("waiting")
+  plannedStartDate  DateTime? @map("planned_start_date")
+  plannedEndDate    DateTime? @map("planned_end_date")
+  actualStartDate   DateTime? @map("actual_start_date")
+  actualEndDate     DateTime? @map("actual_end_date")
+  percentComplete   Int       @default(0) @map("percent_complete")
+  inputData         Json?     @map("input_data")
+  outputData        Json?     @map("output_data")
+  assigneeUserId    String?   @map("assignee_user_id")
+  responsibleRoleId String?   @map("responsible_role_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  instance         ProcessInstance      @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  definition       NodeDefinition       @relation(fields: [definitionId], references: [id])
+  assignee         User?                @relation(fields: [assigneeUserId], references: [id])
+  responsibleRole  Role?                @relation(fields: [responsibleRoleId], references: [id])
+  history          NodeInstanceHistory[]
+  tasks            Task[]
+  aiReports        AiReport[]
+  aiAgentLogs      AiAgentLog[]
+
+  @@map("node_instances")
+}
+
+model NodeInstanceHistory {
+  id             String   @id @default(uuid())
+  nodeInstanceId String   @map("node_instance_id")
+  eventType      String   @map("event_type")
+  actorUserId    String?  @map("actor_user_id")
+  fromStatus     String?  @map("from_status")
+  toStatus       String?  @map("to_status")
+  details        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  nodeInstance NodeInstance @relation(fields: [nodeInstanceId], references: [id], onDelete: Cascade)
+
+  @@map("node_instance_history")
+}
+
+model Task {
+  id             String    @id @default(uuid())
+  nodeInstanceId String    @map("node_instance_id")
+  assigneeUserId String    @map("assignee_user_id")
+  type           String
+  status         String    @default("pending")
+  dueDate        DateTime? @map("due_date")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  nodeInstance NodeInstance @relation(fields: [nodeInstanceId], references: [id], onDelete: Cascade)
+  assignee     User         @relation(fields: [assigneeUserId], references: [id])
+
+  @@map("tasks")
+}
+
+model KnowledgeBase {
+  id          String   @id @default(uuid())
+  name        String
+  type        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  documents KnowledgeBaseDocument[]
+
+  @@map("knowledge_bases")
+}
+
+model KnowledgeBaseDocument {
+  id               String   @id @default(uuid())
+  knowledgeBaseId  String   @map("knowledge_base_id")
+  fileName         String   @map("file_name")
+  filePath         String   @map("file_path")
+  fileSize         BigInt   @default(0) @map("file_size")
+  mimeType         String?  @map("mime_type")
+  parseStatus      String   @default("pending") @map("parse_status")
+  vectorizedStatus String   @default("pending") @map("vectorized_status")
+  chunkCount       Int      @default(0) @map("chunk_count")
+  errorMessage     String?  @map("error_message")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  chunks        DocumentChunk[]
+
+  @@map("knowledge_base_documents")
+}
+
+model DocumentChunk {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  chunkIndex Int      @map("chunk_index")
+  content    String
+  embedding  Unsupported("vector(1536)")?
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeBaseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_chunks")
+}
+
+model AiAgentLog {
+  id             String   @id @default(uuid())
+  nodeInstanceId String?  @map("node_instance_id")
+  role           String
+  input          Json
+  output         Json?
+  latencyMs      Int?     @map("latency_ms")
+  isFallback     Boolean  @default(false) @map("is_fallback")
+  errorMessage   String?  @map("error_message")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  nodeInstance NodeInstance? @relation(fields: [nodeInstanceId], references: [id])
+
+  @@map("ai_agent_logs")
+}
+
+model AiReport {
+  id             String   @id @default(uuid())
+  nodeInstanceId String   @map("node_instance_id")
+  reportType     String   @map("report_type")
+  content        Json
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  nodeInstance NodeInstance @relation(fields: [nodeInstanceId], references: [id], onDelete: Cascade)
+
+  @@map("ai_reports")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  userId         String?  @map("user_id")
+  action         String
+  resourceType   String   @map("resource_type")
+  resourceId     String?  @map("resource_id")
+  details        Json?
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Notification {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  type                String
+  title               String
+  content             String?
+  channel             String    @default("in_app")
+  status              String    @default("unread")
+  relatedResourceType String?   @map("related_resource_type")
+  relatedResourceId   String?   @map("related_resource_id")
+  readAt              DateTime? @map("read_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}

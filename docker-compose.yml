@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: geniusflow-web
+    restart: unless-stopped
+    networks:
+      - geniusflow-network
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: geniusflow-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/geniusflow
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai-service:5000
+      - JWT_SECRET=${JWT_SECRET:-geniusflow-jwt-secret-key-2026}
+      - JWT_EXPIRES_IN=2h
+      - REFRESH_TOKEN_EXPIRES_IN=7d
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - geniusflow-network
+    volumes:
+      - ./uploads:/app/uploads
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: geniusflow-ai
+    restart: unless-stopped
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o-mini
+      - EMBEDDING_MODEL=text-embedding-3-small
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/geniusflow
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - geniusflow-network
+
+  postgres:
+    image: ankane/pgvector:v0.6.0
+    container_name: geniusflow-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=geniusflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - geniusflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: geniusflow-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - geniusflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: geniusflow-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - web
+      - api
+      - ai-service
+    networks:
+      - geniusflow-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  geniusflow-network:
+    driver: bridge
