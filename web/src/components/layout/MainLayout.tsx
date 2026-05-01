@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, theme, Dropdown, Avatar, Space, Typography } from 'antd'
 import {
-  DashboardOutlined,
   NodeIndexOutlined,
   FileTextOutlined,
   CheckSquareOutlined,
@@ -12,6 +11,7 @@ import {
   SettingOutlined,
   UserOutlined,
   LogoutOutlined,
+  ProjectOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -29,14 +29,14 @@ const MainLayout = () => {
 
   const menuItems = [
     {
-      key: '/',
-      icon: <DashboardOutlined />,
-      label: '工作台',
-    },
-    {
       key: '/processes',
       icon: <NodeIndexOutlined />,
       label: '流程管理',
+    },
+    {
+      key: '/instances',
+      icon: <ProjectOutlined />,
+      label: '流程实例',
     },
     {
       key: '/my-tasks',
@@ -69,6 +69,13 @@ const MainLayout = () => {
       label: '系统管理',
     },
   ]
+
+  const getSelectedKey = () => {
+    const path = location.pathname
+    if (path.startsWith('/processes')) return '/processes'
+    if (path.startsWith('/instances')) return '/instances'
+    return path
+  }
 
   const userMenuItems = [
     {
@@ -103,7 +110,7 @@ const MainLayout = () => {
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[getSelectedKey()]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
         />

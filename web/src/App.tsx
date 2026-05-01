@@ -5,6 +5,9 @@ import MainLayout from './components/layout/MainLayout'
 import RouteGuard from './components/common/RouteGuard'
 import ProcessListPage from './pages/process-design/ProcessListPage'
 import ProcessEditorPage from './pages/process-design/ProcessEditorPage'
+import ProcessInstanceListPage from './pages/process-instance/ProcessInstanceListPage'
+import CreateProcessInstancePage from './pages/process-instance/CreateProcessInstancePage'
+import InstanceDetailPage from './pages/process-instance/InstanceDetailPage'
 
 function App() {
   return (
@@ -30,6 +33,9 @@ function App() {
           >
             <Route index element={<Navigate to="/processes" replace />} />
             <Route path="processes" element={<ProcessListPage />} />
+            <Route path="instances" element={<ProcessInstanceListPage />} />
+            <Route path="instances/new" element={<CreateProcessInstancePage />} />
+            <Route path="instances/:id" element={<InstanceDetailPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

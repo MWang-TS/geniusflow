@@ -6,6 +6,9 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProcessDefinitionsModule } from './process-definitions/process-definitions.module';
 import { NodeDefinitionsModule } from './node-definitions/node-definitions.module';
+import { ProcessInstancesModule } from './process-instances/process-instances.module';
+import { NodeInstancesModule } from './node-instances/node-instances.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -18,6 +21,9 @@ import { NodeDefinitionsModule } from './node-definitions/node-definitions.modul
     HealthModule,
     ProcessDefinitionsModule,
     NodeDefinitionsModule,
+    ProcessInstancesModule,
+    NodeInstancesModule,
+    TasksModule,
   ],
 })
 export class AppModule {}

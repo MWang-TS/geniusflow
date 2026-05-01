@@ -18,6 +18,7 @@ import {
   RobotOutlined,
 } from '@ant-design/icons'
 import { useProcessDesignStore } from '../../stores/process-design.store'
+import InputConfigForm from './InputConfigForm'
 
 const NodePropertyPanel: React.FC = () => {
   const currentProcess = useProcessDesignStore((s) => s.currentProcess)
@@ -99,32 +100,40 @@ const NodePropertyPanel: React.FC = () => {
   )
 
   const inputTab = (
-    <Form layout="vertical" size="small" key="input">
-      <Form.Item label="验收标准">
-        <Input.TextArea
-          rows={3}
-          value={node.inputSpec?.acceptanceCriteria || ''}
-          onChange={(e) =>
-            handleSave('inputSpec', {
-              ...node.inputSpec,
-              acceptanceCriteria: e.target.value,
-            })
-          }
-        />
-      </Form.Item>
-      <Form.Item label="来源时间约束（从流程开始第几天）">
-        <InputNumber
-          min={0}
-          value={node.inputSpec?.timeConstraint?.daysFromStart}
-          onChange={(v) =>
-            handleSave('inputSpec', {
-              ...node.inputSpec,
-              timeConstraint: { daysFromStart: v ?? 1 },
-            })
-          }
-        />
-      </Form.Item>
-    </Form>
+    <div key="input" style={{ paddingTop: 4 }}>
+      <div style={{ marginBottom: 12, fontSize: 12, fontWeight: 500, color: '#666' }}>输入字段</div>
+      <InputConfigForm
+        nodeId={node.id}
+        fields={node.inputSpec?.dataSchema || []}
+      />
+      <Form layout="vertical" size="small" style={{ marginTop: 12 }}>
+        <Form.Item label="验收标准">
+          <Input.TextArea
+            rows={3}
+            value={node.inputSpec?.acceptanceCriteria || ''}
+            onChange={(e) =>
+              handleSave('inputSpec', {
+                ...node.inputSpec,
+                acceptanceCriteria: e.target.value,
+              })
+            }
+          />
+        </Form.Item>
+        <Form.Item label="来源时间约束（从流程开始第几天）">
+          <InputNumber
+            min={0}
+            style={{ width: '100%' }}
+            value={node.inputSpec?.timeConstraint?.daysFromStart}
+            onChange={(v) =>
+              handleSave('inputSpec', {
+                ...node.inputSpec,
+                timeConstraint: { daysFromStart: v ?? 1 },
+              })
+            }
+          />
+        </Form.Item>
+      </Form>
+    </div>
   )
 
   const actionTab = (
