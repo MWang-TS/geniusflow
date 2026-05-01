@@ -79,10 +79,10 @@ const ApprovalListPage: React.FC = () => {
       key: 'actions',
       width: 80,
       render: (_, record) => (
-        <Tooltip title="查看详情">
-          <Button type="primary" size="small" icon={<EyeOutlined />}
+        <Tooltip title={record.status === 'pending' ? '去审批' : '查看详情'}>
+          <Button type={record.status === 'pending' ? 'primary' : 'default'} size="small" icon={<EyeOutlined />}
             onClick={() => navigate(`/approvals/${record.id}`)}>
-            审批
+            {record.status === 'pending' ? '审批' : '查看'}
           </Button>
         </Tooltip>
       ),

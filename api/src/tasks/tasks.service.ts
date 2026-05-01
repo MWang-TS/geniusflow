@@ -90,36 +90,37 @@ export class TasksService {
   async approve(taskId: string, comment: string, userId: string) {
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
-      include: { nodeInstance: true },
+      include: { nodeInstance: { include: { instance: { select: { id: true } } } } },
     })
     if (!task) throw new NotFoundException('审批任务不存在')
     if (task.type !== 'approve') throw new ConflictException('该任务不是审批任务')
     if (task.status !== 'pending') throw new ConflictException('该任务已处理')
 
-    await this.prisma.task.update({
-      where: { id: taskId },
-      data: { status: 'completed', completedAt: new Date() },
-    })
-
     const nodeInstanceId = task.nodeInstanceId
-    await this.prisma.nodeInstance.update({
-      where: { id: nodeInstanceId },
-      data: { status: 'completed', actualEndDate: new Date() },
-    })
 
-    await this.prisma.nodeInstanceHistory.create({
-      data: {
-        nodeInstanceId,
-        eventType: 'approve',
-        actorUserId: userId,
-        fromStatus: 'pending_approval',
-        toStatus: 'completed',
-        details: { comment } as any,
-      },
-    })
+    await this.prisma.$transaction([
+      this.prisma.task.update({
+        where: { id: taskId },
+        data: { status: 'completed', completedAt: new Date() },
+      }),
+      this.prisma.nodeInstance.update({
+        where: { id: nodeInstanceId },
+        data: { status: 'completed', actualEndDate: new Date() },
+      }),
+      this.prisma.nodeInstanceHistory.create({
+        data: {
+          nodeInstanceId,
+          eventType: 'approve',
+          actorUserId: userId,
+          fromStatus: 'pending_approval',
+          toStatus: 'completed',
+          details: { comment } as any,
+        },
+      }),
+    ])
 
     await this.nodeInstancesService.advanceProcessPublic(
-      task.nodeInstance.instanceId,
+      task.nodeInstance.instance.id,
       nodeInstanceId,
     )
 
@@ -135,27 +136,28 @@ export class TasksService {
     if (task.type !== 'approve') throw new ConflictException('该任务不是审批任务')
     if (task.status !== 'pending') throw new ConflictException('该任务已处理')
 
-    await this.prisma.task.update({
-      where: { id: taskId },
-      data: { status: 'completed', completedAt: new Date() },
-    })
-
     const nodeInstanceId = task.nodeInstanceId
-    await this.prisma.nodeInstance.update({
-      where: { id: nodeInstanceId },
-      data: { status: 'in_progress', percentComplete: 0 },
-    })
 
-    await this.prisma.nodeInstanceHistory.create({
-      data: {
-        nodeInstanceId,
-        eventType: 'reject',
-        actorUserId: userId,
-        fromStatus: 'pending_approval',
-        toStatus: 'in_progress',
-        details: { comment } as any,
-      },
-    })
+    await this.prisma.$transaction([
+      this.prisma.task.update({
+        where: { id: taskId },
+        data: { status: 'completed', completedAt: new Date() },
+      }),
+      this.prisma.nodeInstance.update({
+        where: { id: nodeInstanceId },
+        data: { status: 'in_progress', percentComplete: 0 },
+      }),
+      this.prisma.nodeInstanceHistory.create({
+        data: {
+          nodeInstanceId,
+          eventType: 'reject',
+          actorUserId: userId,
+          fromStatus: 'pending_approval',
+          toStatus: 'in_progress',
+          details: { comment } as any,
+        },
+      }),
+    ])
 
     return { status: 'in_progress', message: '已驳回，等待员工修改后重新提交' }
   }

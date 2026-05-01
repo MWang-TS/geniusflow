@@ -252,10 +252,12 @@ const ApprovalDetailPage: React.FC = () => {
 
       {isPending && (
         <Card style={{ marginTop: 16 }} title="审批操作">
-          <Form.Item label="审批意见" style={{ marginBottom: 12 }}>
-            <TextArea rows={3} placeholder="请输入审批意见（驳回时必填）"
-              value={comment} onChange={(e) => setComment(e.target.value)} />
-          </Form.Item>
+          <Form layout="vertical">
+            <Form.Item label="审批意见" style={{ marginBottom: 12 }}>
+              <TextArea rows={3} placeholder="请输入审批意见（驳回时必填）"
+                value={comment} onChange={(e) => setComment(e.target.value)} />
+            </Form.Item>
+          </Form>
           <div style={{ textAlign: 'center' }}>
             <Space size="large">
               <Button type="primary" size="large" icon={<CheckOutlined />}
