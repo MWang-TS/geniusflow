@@ -74,6 +74,7 @@ const MainLayout = () => {
     const path = location.pathname
     if (path.startsWith('/processes')) return '/processes'
     if (path.startsWith('/instances')) return '/instances'
+    if (path.startsWith('/my-tasks')) return '/my-tasks'
     return path
   }
 

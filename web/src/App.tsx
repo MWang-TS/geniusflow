@@ -8,6 +8,8 @@ import ProcessEditorPage from './pages/process-design/ProcessEditorPage'
 import ProcessInstanceListPage from './pages/process-instance/ProcessInstanceListPage'
 import CreateProcessInstancePage from './pages/process-instance/CreateProcessInstancePage'
 import InstanceDetailPage from './pages/process-instance/InstanceDetailPage'
+import MyTasksPage from './pages/my-tasks/MyTasksPage'
+import NodeExecutionPage from './pages/my-tasks/NodeExecutionPage'
 
 function App() {
   return (
@@ -36,6 +38,8 @@ function App() {
             <Route path="instances" element={<ProcessInstanceListPage />} />
             <Route path="instances/new" element={<CreateProcessInstancePage />} />
             <Route path="instances/:id" element={<InstanceDetailPage />} />
+            <Route path="my-tasks" element={<MyTasksPage />} />
+            <Route path="my-tasks/:nodeInstanceId/execute" element={<NodeExecutionPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
