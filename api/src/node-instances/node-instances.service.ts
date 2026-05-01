@@ -4,11 +4,17 @@ import {
   ConflictException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { QueueService } from '../queue/queue.service'
+import { WsGateway } from '../ws/ws.gateway'
 import { SaveNodeInstanceDto, SubmitNodeInstanceDto, UpdateProgressDto } from './dto/node-instance.dto'
 
 @Injectable()
 export class NodeInstancesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private queueService: QueueService,
+    private wsGateway: WsGateway,
+  ) {}
 
   async findOne(id: string) {
     const node = await this.prisma.nodeInstance.findUnique({
@@ -79,32 +85,53 @@ export class NodeInstancesService {
     const progressConfig = node.definition.progressConfig as Record<string, unknown> | null
     const needApproval = progressConfig?.needApproval !== false
 
-    let newStatus: string
     if (needApproval) {
-      newStatus = 'ai_inspecting'
-    } else {
-      newStatus = 'completed'
-      await this.advanceProcess(node.instanceId, id)
-    }
+      const inputSpec = node.definition.inputSpec as Record<string, unknown> | null
+      const outputSpec = node.definition.outputSpec as Record<string, unknown> | null
 
-    const updated = await this.prisma.nodeInstance.update({
-      where: { id },
-      data: { status: newStatus, actualEndDate: newStatus === 'completed' ? new Date() : undefined },
-    })
+      await this.prisma.nodeInstanceHistory.create({
+        data: {
+          nodeInstanceId: id,
+          eventType: 'submit',
+          actorUserId: userId,
+          fromStatus: 'in_progress',
+          toStatus: 'ai_inspecting',
+        },
+      })
 
-    await this.prisma.nodeInstanceHistory.create({
-      data: {
+      await this.queueService.addInspectorJob({
         nodeInstanceId: id,
-        eventType: 'submit',
-        actorUserId: userId,
-        fromStatus: 'in_progress',
-        toStatus: newStatus,
-      },
-    })
+        processInstanceId: node.instanceId,
+        nodeName: node.definition.nodeName,
+        inputData: (dto.inputData || {}) as Record<string, unknown>,
+        outputData: (dto.outputData || {}) as Record<string, unknown>,
+        acceptanceCriteria: (inputSpec?.acceptanceCriteria as string) || '',
+        qualityStandard: (outputSpec?.qualityStandard as string) || '',
+        userId,
+      })
 
-    return {
-      status: updated.status,
-      message: needApproval ? '已提交，等待审批' : '提交完成',
+      return {
+        status: 'ai_inspecting',
+        message: '已提交，AI 正在校验中...',
+      }
+    } else {
+      await this.prisma.nodeInstance.update({
+        where: { id },
+        data: { status: 'completed', actualEndDate: new Date() },
+      })
+
+      await this.prisma.nodeInstanceHistory.create({
+        data: {
+          nodeInstanceId: id,
+          eventType: 'submit',
+          actorUserId: userId,
+          fromStatus: 'in_progress',
+          toStatus: 'completed',
+        },
+      })
+
+      await this.advanceProcess(node.instanceId, id)
+      return { status: 'completed', message: '提交完成' }
     }
   }
 

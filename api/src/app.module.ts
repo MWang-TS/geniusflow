@@ -9,6 +9,8 @@ import { NodeDefinitionsModule } from './node-definitions/node-definitions.modul
 import { ProcessInstancesModule } from './process-instances/process-instances.module';
 import { NodeInstancesModule } from './node-instances/node-instances.module';
 import { TasksModule } from './tasks/tasks.module';
+import { QueueModule } from './queue/queue.module';
+import { WsModule } from './ws/ws.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { TasksModule } from './tasks/tasks.module';
       isGlobal: true,
     }),
     PrismaModule,
+    QueueModule,
+    WsModule,
     AuthModule,
     UsersModule,
     HealthModule,

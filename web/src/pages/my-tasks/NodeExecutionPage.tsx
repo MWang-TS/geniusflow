@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Collapse, Descriptions, Tag, Slider, Button, Space, Spin, App, Divider } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons'
 import { nodeInstanceApi, type NodeInstanceDetail } from '../../api/node-instance'
+import { useWebSocket } from '../../hooks/useWebSocket'
+import { useAuthStore } from '../../stores/auth.store'
 import DynamicFormFill from '../../components/common/DynamicFormFill'
+import AiInspectionOverlay, { type AiInspectionResult } from '../../components/common/AiInspectionOverlay'
 
 const statusMap: Record<string, { color: string; label: string }> = {
   waiting: { color: 'default', label: '等待中' },
@@ -17,6 +20,8 @@ const NodeExecutionPage: React.FC = () => {
   const { nodeInstanceId } = useParams<{ nodeInstanceId: string }>()
   const navigate = useNavigate()
   const { message } = App.useApp()
+  const token = useAuthStore((s) => s.accessToken)
+  const { socket } = useWebSocket(token)
 
   const [node, setNode] = useState<NodeInstanceDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,6 +30,28 @@ const NodeExecutionPage: React.FC = () => {
   const [inputValues, setInputValues] = useState<Record<string, unknown>>({})
   const [outputValues, setOutputValues] = useState<Record<string, unknown>>({})
   const [percentComplete, setPercentComplete] = useState(0)
+  const [aiResult, setAiResult] = useState<AiInspectionResult | null>(null)
+  const [showAiOverlay, setShowAiOverlay] = useState(false)
+  const pendingRef = useRef(false)
+
+  useEffect(() => {
+    if (!socket.current || !nodeInstanceId) return
+
+    const handleAiResult = (data: AiInspectionResult) => {
+      if (data.nodeInstanceId !== nodeInstanceId) return
+      setAiResult(data)
+      if (data.passed) {
+        setNode((prev) => prev ? { ...prev, status: 'pending_approval' } : prev)
+      } else {
+        setNode((prev) => prev ? { ...prev, status: 'in_progress' } : prev)
+      }
+    }
+
+    socket.current.on('ai:result', handleAiResult)
+    return () => {
+      socket.current?.off('ai:result', handleAiResult)
+    }
+  }, [socket.current, nodeInstanceId])
 
   useEffect(() => {
     if (!nodeInstanceId) return
@@ -79,14 +106,33 @@ const NodeExecutionPage: React.FC = () => {
         outputData: outputValues,
         percentComplete: 100,
       })
-      message.success(res.data?.message || '提交成功')
-      navigate('/my-tasks')
+      if (res.data?.status === 'ai_inspecting') {
+        setShowAiOverlay(true)
+        pendingRef.current = true
+        message.info('已提交，AI 正在校验中...')
+      } else {
+        message.success(res.data?.message || '提交完成')
+        navigate('/my-tasks')
+      }
     } catch {
       message.error('提交失败')
     } finally {
       setSubmitting(false)
     }
   }, [nodeInstanceId, inputValues, outputValues, navigate, message])
+
+  const handleAiOverlayClose = useCallback(() => {
+    setShowAiOverlay(false)
+    if (aiResult?.passed) {
+      navigate('/my-tasks')
+    }
+  }, [aiResult, navigate])
+
+  const handleRetry = useCallback(() => {
+    setShowAiOverlay(false)
+    setAiResult(null)
+    setPercentComplete(0)
+  }, [])
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
   if (!node) return <div style={{ textAlign: 'center', padding: 60 }}>节点不存在</div>
@@ -222,6 +268,13 @@ const NodeExecutionPage: React.FC = () => {
           </Space>
         </div>
       )}
+
+      <AiInspectionOverlay
+        visible={showAiOverlay}
+        result={aiResult}
+        onClose={handleAiOverlayClose}
+        onRetry={handleRetry}
+      />
     </div>
   )
 }
