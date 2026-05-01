@@ -151,6 +151,10 @@ export class NodeInstancesService {
   }
 
   private async advanceProcess(instanceId: string, currentNodeInstanceId: string) {
+    return this.advanceProcessPublic(instanceId, currentNodeInstanceId)
+  }
+
+  async advanceProcessPublic(instanceId: string, currentNodeInstanceId: string) {
     const nodeInstance = await this.prisma.nodeInstance.findUnique({
       where: { id: currentNodeInstanceId },
       include: { definition: true },

@@ -10,6 +10,8 @@ import CreateProcessInstancePage from './pages/process-instance/CreateProcessIns
 import InstanceDetailPage from './pages/process-instance/InstanceDetailPage'
 import MyTasksPage from './pages/my-tasks/MyTasksPage'
 import NodeExecutionPage from './pages/my-tasks/NodeExecutionPage'
+import ApprovalListPage from './pages/approval/ApprovalListPage'
+import ApprovalDetailPage from './pages/approval/ApprovalDetailPage'
 
 function App() {
   return (
@@ -40,6 +42,8 @@ function App() {
             <Route path="instances/:id" element={<InstanceDetailPage />} />
             <Route path="my-tasks" element={<MyTasksPage />} />
             <Route path="my-tasks/:nodeInstanceId/execute" element={<NodeExecutionPage />} />
+            <Route path="approvals" element={<ApprovalListPage />} />
+            <Route path="approvals/:taskId" element={<ApprovalDetailPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

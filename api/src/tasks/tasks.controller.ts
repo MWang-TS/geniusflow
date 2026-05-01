@@ -1,6 +1,7 @@
-import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Post, Param, Body, Query, UseGuards, Req } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/roles.guard'
+import { Roles } from '../auth/roles.decorator'
 import { TasksService } from './tasks.service'
 
 @Controller('tasks')
@@ -25,5 +26,22 @@ export class TasksController {
       },
       req.user.userId,
     )
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id)
+  }
+
+  @Post(':id/approve')
+  @Roles('manager', 'admin')
+  approve(@Param('id') id: string, @Body('comment') comment: string, @Req() req: any) {
+    return this.service.approve(id, comment || '', req.user.userId)
+  }
+
+  @Post(':id/reject')
+  @Roles('manager', 'admin')
+  reject(@Param('id') id: string, @Body('comment') comment: string, @Req() req: any) {
+    return this.service.reject(id, comment || '', req.user.userId)
   }
 }
