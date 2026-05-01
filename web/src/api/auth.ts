@@ -20,4 +20,7 @@ export interface LoginResponse {
 export const authApi = {
   login: (data: LoginRequest) =>
     client.post<any, { code: number; data: LoginResponse }>('/auth/login', data),
+
+  refresh: (refreshToken: string) =>
+    client.post<any, { code: number; data: { accessToken: string; expiresIn: number } }>('/auth/refresh', { refreshToken }),
 }

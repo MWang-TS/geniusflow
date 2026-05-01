@@ -30,7 +30,10 @@ export const useAuthStore = create<AuthState>()(
         const res = await authApi.login(credentials)
         if (res.code === 0) {
           set({
-            user: res.data.user,
+            user: {
+              ...res.data.user,
+              roles: res.data.user.roles || [],
+            },
             accessToken: res.data.accessToken,
             refreshToken: res.data.refreshToken,
             isAuthenticated: true,

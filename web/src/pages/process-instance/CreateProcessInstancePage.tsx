@@ -29,6 +29,7 @@ const CreateProcessInstancePage: React.FC = () => {
     usersApi.list().then((r) => {
       if (r.data?.list) setUsers(r.data.list)
       else if (Array.isArray(r.data)) setUsers(r.data)
+      else if (Array.isArray(r.data?.data)) setUsers(r.data.data)
     }).catch(() => {})
   }, [])
 

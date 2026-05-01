@@ -206,6 +206,13 @@ export class ProcessInstancesService {
       data: { status: 'cancelled' },
     })
 
+    const activeNodes = await this.prisma.nodeInstance.findMany({
+      where: {
+        instanceId: id,
+        status: { in: ['waiting', 'in_progress', 'pending_approval'] },
+      },
+    })
+
     await this.prisma.nodeInstance.updateMany({
       where: {
         instanceId: id,
@@ -214,9 +221,6 @@ export class ProcessInstancesService {
       data: { status: 'rejected' },
     })
 
-    const activeNodes = await this.prisma.nodeInstance.findMany({
-      where: { instanceId: id, status: 'rejected' },
-    })
     for (const node of activeNodes) {
       await this.prisma.nodeInstanceHistory.create({
         data: {

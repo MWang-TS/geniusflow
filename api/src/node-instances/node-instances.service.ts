@@ -72,6 +72,7 @@ export class NodeInstancesService {
     if (dto.inputData !== undefined) data.inputData = dto.inputData as any
     if (dto.outputData !== undefined) data.outputData = dto.outputData as any
     data.percentComplete = 100
+    data.actualStartDate = node.actualStartDate || new Date()
 
     await this.prisma.nodeInstance.update({ where: { id }, data })
 
