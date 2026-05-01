@@ -185,6 +185,78 @@ export class ProcessInstancesService {
     return instance
   }
 
+  async getGanttData(id: string) {
+    const instance = await this.prisma.processInstance.findUnique({
+      where: { id },
+      include: {
+        definition: { select: { name: true } },
+        nodeInstances: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            definition: { select: { nodeName: true } },
+            assignee: { select: { name: true } },
+          },
+        },
+      },
+    })
+    if (!instance) throw new NotFoundException('流程实例不存在')
+
+    return {
+      instanceId: instance.id,
+      processName: instance.definition.name,
+      plannedStartDate: instance.plannedStartDate,
+      actualStartDate: instance.actualStartDate,
+      tasks: instance.nodeInstances.map((n) => {
+        const start = n.plannedStartDate ? new Date(n.plannedStartDate) : null
+        const end = n.plannedEndDate ? new Date(n.plannedEndDate) : null
+        const actualStart = n.actualStartDate ? new Date(n.actualStartDate) : null
+        const actualEnd = n.actualEndDate ? new Date(n.actualEndDate) : null
+
+        return {
+          id: n.id,
+          name: n.definition.nodeName,
+          assignee: n.assignee?.name || null,
+          status: n.status,
+          percentComplete: n.percentComplete,
+          plannedStartDate: start,
+          plannedEndDate: end,
+          actualStartDate: actualStart,
+          actualEndDate: actualEnd,
+          duration: end && start ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0,
+          isOverdue: end && n.status !== 'completed' && n.status !== 'rejected'
+            ? new Date() > end
+            : false,
+        }
+      }),
+    }
+  }
+
+  async updateBaseline(id: string, dto: { plannedStartDate?: string; nodeAdjustments?: Array<{ nodeInstanceId: string; plannedStartDate: string; plannedEndDate: string }> }) {
+    const instance = await this.prisma.processInstance.findUnique({ where: { id } })
+    if (!instance) throw new NotFoundException('流程实例不存在')
+
+    if (dto.plannedStartDate) {
+      await this.prisma.processInstance.update({
+        where: { id },
+        data: { plannedStartDate: new Date(dto.plannedStartDate) },
+      })
+    }
+
+    if (dto.nodeAdjustments) {
+      for (const adj of dto.nodeAdjustments) {
+        await this.prisma.nodeInstance.update({
+          where: { id: adj.nodeInstanceId },
+          data: {
+            plannedStartDate: new Date(adj.plannedStartDate),
+            plannedEndDate: new Date(adj.plannedEndDate),
+          },
+        })
+      }
+    }
+
+    return this.getGanttData(id)
+  }
+
   async terminate(id: string, reason: string) {
     const instance = await this.prisma.processInstance.findUnique({
       where: { id },

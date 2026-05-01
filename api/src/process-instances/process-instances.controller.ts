@@ -28,6 +28,11 @@ export class ProcessInstancesController {
     })
   }
 
+  @Get(':id/gantt')
+  getGanttData(@Param('id') id: string) {
+    return this.service.getGanttData(id)
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id)
@@ -43,5 +48,11 @@ export class ProcessInstancesController {
   @Roles('manager', 'admin')
   terminate(@Param('id') id: string, @Body() dto: TerminateProcessInstanceDto) {
     return this.service.terminate(id, dto.reason)
+  }
+
+  @Post(':id/baseline')
+  @Roles('manager', 'admin')
+  updateBaseline(@Param('id') id: string, @Body() dto: any) {
+    return this.service.updateBaseline(id, dto)
   }
 }

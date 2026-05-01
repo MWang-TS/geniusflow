@@ -9,6 +9,7 @@ import {
   BookOutlined,
   AppstoreOutlined,
   SettingOutlined,
+  BellOutlined,
   UserOutlined,
   LogoutOutlined,
   ProjectOutlined,
@@ -59,6 +60,11 @@ const MainLayout = () => {
       label: '知识库',
     },
     {
+      key: '/notifications',
+      icon: <BellOutlined />,
+      label: '通知中心',
+    },
+    {
       key: '/templates',
       icon: <AppstoreOutlined />,
       label: '模板市场',
@@ -77,6 +83,8 @@ const MainLayout = () => {
     if (path.startsWith('/my-tasks')) return '/my-tasks'
     if (path.startsWith('/approvals')) return '/approvals'
     if (path.startsWith('/knowledge-bases')) return '/knowledge-bases'
+    if (path.startsWith('/notifications')) return '/notifications'
+    if (path.startsWith('/progress')) return '/progress'
     return path
   }
 

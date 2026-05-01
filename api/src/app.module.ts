@@ -10,6 +10,7 @@ import { ProcessInstancesModule } from './process-instances/process-instances.mo
 import { NodeInstancesModule } from './node-instances/node-instances.module';
 import { TasksModule } from './tasks/tasks.module';
 import { KnowledgeBasesModule } from './knowledge-bases/knowledge-bases.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { QueueModule } from './queue/queue.module';
 import { WsModule } from './ws/ws.module';
 
@@ -30,6 +31,7 @@ import { WsModule } from './ws/ws.module';
     NodeInstancesModule,
     TasksModule,
     KnowledgeBasesModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

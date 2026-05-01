@@ -13,6 +13,9 @@ import NodeExecutionPage from './pages/my-tasks/NodeExecutionPage'
 import ApprovalListPage from './pages/approval/ApprovalListPage'
 import ApprovalDetailPage from './pages/approval/ApprovalDetailPage'
 import KnowledgeBaseListPage from './pages/knowledge-base/KnowledgeBaseListPage'
+import ProgressListPage from './pages/progress/ProgressListPage'
+import ProgressDetailPage from './pages/progress/ProgressDetailPage'
+import NotificationListPage from './pages/notifications/NotificationListPage'
 
 function App() {
   return (
@@ -46,6 +49,9 @@ function App() {
             <Route path="approvals" element={<ApprovalListPage />} />
             <Route path="approvals/:taskId" element={<ApprovalDetailPage />} />
             <Route path="knowledge-bases" element={<KnowledgeBaseListPage />} />
+            <Route path="progress" element={<ProgressListPage />} />
+            <Route path="progress/:id" element={<ProgressDetailPage />} />
+            <Route path="notifications" element={<NotificationListPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Descriptions, Tag, Spin, Button, App, Steps } from 'antd'
+import { Card, Descriptions, Tag, Spin, Button, App, Steps, Tabs } from 'antd'
 import { ArrowLeftOutlined, LoadingOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons'
-import { processInstanceApi, type ProcessInstanceDetail } from '../../api/process-instance'
+import { processInstanceApi, type ProcessInstanceDetail, type GanttData } from '../../api/process-instance'
+import GanttChart from '../../components/common/GanttChart'
 
 const statusMap: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
   waiting: { color: 'default', label: '等待中', icon: <ClockCircleOutlined /> },
@@ -18,6 +19,7 @@ const InstanceDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const { message } = App.useApp()
   const [instance, setInstance] = useState<ProcessInstanceDetail | null>(null)
+  const [ganttData, setGanttData] = useState<GanttData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,6 +29,13 @@ const InstanceDetailPage: React.FC = () => {
       .catch(() => message.error('加载失败'))
       .finally(() => setLoading(false))
   }, [id])
+
+  const loadGantt = useCallback(() => {
+    if (!id || ganttData) return
+    processInstanceApi.getGanttData(id)
+      .then((r) => setGanttData(r.data))
+      .catch(() => {})
+  }, [id, ganttData])
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
   if (!instance) return <div style={{ textAlign: 'center', padding: 60 }}>实例不存在</div>
@@ -66,13 +75,32 @@ const InstanceDetailPage: React.FC = () => {
         </Descriptions>
       </Card>
 
-      <Card title="节点进度" style={{ marginTop: 16 }}>
-        <Steps
-          direction="vertical"
-          size="small"
-          current={instance.nodeInstances.findIndex((n) => n.status === 'in_progress')}
-          items={stepItems}
-        />
+      <Card style={{ marginTop: 16 }}>
+        <Tabs defaultActiveKey="steps" items={[
+          {
+            key: 'steps',
+            label: '节点进度',
+            children: (
+              <Steps
+                direction="vertical"
+                size="small"
+                current={instance.nodeInstances.findIndex((n) => n.status === 'in_progress')}
+                items={stepItems}
+              />
+            ),
+          },
+          {
+            key: 'gantt',
+            label: '甘特图',
+            children: ganttData
+              ? <GanttChart tasks={ganttData.tasks} projectStart={ganttData.plannedStartDate} />
+              : (
+                <div style={{ textAlign: 'center', padding: 24 }}>
+                  <Button onClick={loadGantt}>加载甘特图</Button>
+                </div>
+              ),
+          },
+        ]} />
       </Card>
     </div>
   )
