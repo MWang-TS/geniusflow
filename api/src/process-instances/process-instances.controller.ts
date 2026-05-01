@@ -12,7 +12,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/roles.guard'
 import { Roles } from '../auth/roles.decorator'
 import { ProcessInstancesService } from './process-instances.service'
-import { CreateProcessInstanceDto, TerminateProcessInstanceDto } from './dto/create-process-instance.dto'
+import { CreateProcessInstanceDto, TerminateProcessInstanceDto, UpdateBaselineDto } from './dto/create-process-instance.dto'
 
 @Controller('process-instances')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,7 +52,7 @@ export class ProcessInstancesController {
 
   @Post(':id/baseline')
   @Roles('manager', 'admin')
-  updateBaseline(@Param('id') id: string, @Body() dto: any) {
+  updateBaseline(@Param('id') id: string, @Body() dto: UpdateBaselineDto) {
     return this.service.updateBaseline(id, dto)
   }
 }

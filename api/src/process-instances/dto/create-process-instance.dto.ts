@@ -19,3 +19,16 @@ export class TerminateProcessInstanceDto {
   @IsNotEmpty()
   reason: string
 }
+
+export class UpdateBaselineDto {
+  @IsOptional()
+  @IsDateString()
+  plannedStartDate?: string
+
+  @IsOptional()
+  nodeAdjustments?: Array<{
+    nodeInstanceId: string
+    plannedStartDate: string
+    plannedEndDate: string
+  }>
+}

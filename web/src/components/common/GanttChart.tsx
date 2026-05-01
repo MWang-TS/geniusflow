@@ -171,7 +171,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ tasks, projectStart }) => {
                       <rect
                         x={LABEL_WIDTH + actualX}
                         y={barY + BAR_HEIGHT / 2 + 1}
-                        width={task.actualEndDate ? getX(task.actualEndDate) - actualX : dayWidth * (task.percentComplete / 100)}
+                        width={task.actualEndDate ? Math.max(2, getX(task.actualEndDate) - actualX) : Math.max(2, dayWidth * (task.percentComplete / 100))}
                         height={BAR_HEIGHT / 2 - 2}
                         rx={3}
                         fill={color}

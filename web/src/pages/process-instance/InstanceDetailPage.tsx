@@ -31,11 +31,11 @@ const InstanceDetailPage: React.FC = () => {
   }, [id])
 
   const loadGantt = useCallback(() => {
-    if (!id || ganttData) return
+    if (!id) return
     processInstanceApi.getGanttData(id)
       .then((r) => setGanttData(r.data))
       .catch(() => {})
-  }, [id, ganttData])
+  }, [id])
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
   if (!instance) return <div style={{ textAlign: 'center', padding: 60 }}>实例不存在</div>
