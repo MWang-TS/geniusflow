@@ -8,7 +8,8 @@ export function useWebSocket(token: string | null) {
   useEffect(() => {
     if (!token) return
 
-    const socket = io('http://localhost:4000', {
+    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:4000'
+    const socket = io(wsUrl, {
       path: '/ws/socket.io',
       auth: { token },
       transports: ['websocket', 'polling'],

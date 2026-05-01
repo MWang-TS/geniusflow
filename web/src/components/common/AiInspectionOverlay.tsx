@@ -1,4 +1,3 @@
-import React from 'react'
 import { Modal, Tag, List, Typography, Progress } from 'antd'
 import {
   LoadingOutlined,
@@ -71,7 +70,7 @@ const AiInspectionOverlay: React.FC<AiInspectionOverlayProps> = ({
           ) : (
             <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 20 }} />
           )}
-          <span>{isFallback ? 'AI 督导降级' : result.passed ? 'AI 督导通过' : 'AI 督导未通过'}</span>
+          <span>{isFallback ? 'AI 督导降级（人工审核）' : result.passed ? 'AI 督导通过' : 'AI 督导未通过'}</span>
         </div>
       }
       onCancel={onClose}

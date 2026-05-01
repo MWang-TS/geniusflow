@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Collapse, Descriptions, Tag, Slider, Button, Space, Spin, App, Divider } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons'
@@ -32,7 +32,6 @@ const NodeExecutionPage: React.FC = () => {
   const [percentComplete, setPercentComplete] = useState(0)
   const [aiResult, setAiResult] = useState<AiInspectionResult | null>(null)
   const [showAiOverlay, setShowAiOverlay] = useState(false)
-  const pendingRef = useRef(false)
 
   useEffect(() => {
     if (!socket.current || !nodeInstanceId) return
@@ -108,7 +107,6 @@ const NodeExecutionPage: React.FC = () => {
       })
       if (res.data?.status === 'ai_inspecting') {
         setShowAiOverlay(true)
-        pendingRef.current = true
         message.info('已提交，AI 正在校验中...')
       } else {
         message.success(res.data?.message || '提交完成')

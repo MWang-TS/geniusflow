@@ -77,9 +77,9 @@ const DynamicFormFill: React.FC<DynamicFormFillProps> = ({
       initialValues={values}
       onValuesChange={handleValuesChange}
     >
-      {fields.map((field) => (
+      {fields.map((field, index) => (
         <Form.Item
-          key={field.name}
+          key={`${field.name}-${index}`}
           label={field.name}
           name={field.name}
           rules={field.required ? [{ required: true, message: `请输入${field.name}` }] : []}

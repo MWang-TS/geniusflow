@@ -129,6 +129,10 @@ export class AiInspectorProcessor {
     })
 
     if (taskNode) {
+      await this.prisma.task.updateMany({
+        where: { nodeInstanceId, type: 'execute', status: 'pending' },
+        data: { status: 'completed' },
+      })
       await this.prisma.task.create({
         data: {
           nodeInstanceId,

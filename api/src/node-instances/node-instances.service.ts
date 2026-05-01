@@ -89,6 +89,11 @@ export class NodeInstancesService {
       const inputSpec = node.definition.inputSpec as Record<string, unknown> | null
       const outputSpec = node.definition.outputSpec as Record<string, unknown> | null
 
+      await this.prisma.nodeInstance.update({
+        where: { id },
+        data: { status: 'ai_inspecting' },
+      })
+
       await this.prisma.nodeInstanceHistory.create({
         data: {
           nodeInstanceId: id,
