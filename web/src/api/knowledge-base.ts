@@ -51,7 +51,9 @@ export const knowledgeBaseApi = {
   uploadDocument: (id: string, file: File) => {
     const form = new FormData()
     form.append('file', file)
-    return client.post(`/knowledge-bases/${id}/documents`, form)
+    return client.post(`/knowledge-bases/${id}/documents`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
   },
 
   reindex: (id: string, docId: string) =>

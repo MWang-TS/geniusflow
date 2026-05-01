@@ -52,7 +52,7 @@ const KnowledgeBaseListPage: React.FC = () => {
     }
   }, [typeFilter, message])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [typeFilter])
 
   const fetchDocs = useCallback(async (kbId: string, page = 1, pageSize = 10) => {
     setDocsLoading(true)

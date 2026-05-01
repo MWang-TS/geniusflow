@@ -116,6 +116,11 @@ export class KnowledgeBasesService {
   async uploadDocument(kbId: string, file: { originalname: string; buffer: Buffer; size: number; mimetype: string }) {
     await this.findOne(kbId)
 
+    const MAX_SIZE = 50 * 1024 * 1024
+    if (file.size > MAX_SIZE) {
+      throw new Error('文件大小超过 50MB 限制')
+    }
+
     const uploadDir = path.resolve('uploads', 'knowledge', kbId)
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true })

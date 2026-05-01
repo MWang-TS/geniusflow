@@ -1,16 +1,11 @@
 import re
-import io
 from typing import List
-
-
-def parse_txt(content: str) -> str:
-    return content
 
 
 def parse_content(content: str, file_name: str) -> str:
     ext = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
     if ext == 'txt':
-        return parse_txt(content)
+        return content
     return content
 
 

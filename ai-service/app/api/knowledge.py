@@ -1,9 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional
-import json
-import asyncio
-from openai import AsyncOpenAI
+from typing import List
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from psycopg2.extras import RealDictCursor
@@ -11,7 +8,6 @@ from psycopg2.extras import RealDictCursor
 from app.core.config import settings
 
 router = APIRouter()
-client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 class EmbeddingRequest(BaseModel):
@@ -48,6 +44,8 @@ def get_db():
 @router.post("/embed", response_model=EmbeddingResponse)
 async def embed(request: EmbeddingRequest):
     try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         result = await client.embeddings.create(
             model=settings.EMBEDDING_MODEL,
             input=request.texts,
@@ -61,6 +59,8 @@ async def embed(request: EmbeddingRequest):
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest):
     try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         query_embedding_resp = await client.embeddings.create(
             model=settings.EMBEDDING_MODEL,
             input=[request.query],
