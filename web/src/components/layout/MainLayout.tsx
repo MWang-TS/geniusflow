@@ -76,6 +76,7 @@ const MainLayout = () => {
     if (path.startsWith('/instances')) return '/instances'
     if (path.startsWith('/my-tasks')) return '/my-tasks'
     if (path.startsWith('/approvals')) return '/approvals'
+    if (path.startsWith('/knowledge-bases')) return '/knowledge-bases'
     return path
   }
 

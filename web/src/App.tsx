@@ -12,6 +12,7 @@ import MyTasksPage from './pages/my-tasks/MyTasksPage'
 import NodeExecutionPage from './pages/my-tasks/NodeExecutionPage'
 import ApprovalListPage from './pages/approval/ApprovalListPage'
 import ApprovalDetailPage from './pages/approval/ApprovalDetailPage'
+import KnowledgeBaseListPage from './pages/knowledge-base/KnowledgeBaseListPage'
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
             <Route path="my-tasks/:nodeInstanceId/execute" element={<NodeExecutionPage />} />
             <Route path="approvals" element={<ApprovalListPage />} />
             <Route path="approvals/:taskId" element={<ApprovalDetailPage />} />
+            <Route path="knowledge-bases" element={<KnowledgeBaseListPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

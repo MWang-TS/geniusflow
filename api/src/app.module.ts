@@ -9,6 +9,7 @@ import { NodeDefinitionsModule } from './node-definitions/node-definitions.modul
 import { ProcessInstancesModule } from './process-instances/process-instances.module';
 import { NodeInstancesModule } from './node-instances/node-instances.module';
 import { TasksModule } from './tasks/tasks.module';
+import { KnowledgeBasesModule } from './knowledge-bases/knowledge-bases.module';
 import { QueueModule } from './queue/queue.module';
 import { WsModule } from './ws/ws.module';
 
@@ -28,6 +29,7 @@ import { WsModule } from './ws/ws.module';
     ProcessInstancesModule,
     NodeInstancesModule,
     TasksModule,
+    KnowledgeBasesModule,
   ],
 })
 export class AppModule {}

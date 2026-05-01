@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api import inspector, assistant, health
+from app.api import inspector, assistant, health, knowledge
 from app.core.config import settings
 
 
@@ -31,6 +31,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(inspector.router, prefix="/ai", tags=["inspector"])
 app.include_router(assistant.router, prefix="/ai", tags=["assistant"])
+app.include_router(knowledge.router, prefix="/ai", tags=["knowledge"])
 
 
 @app.get("/")
