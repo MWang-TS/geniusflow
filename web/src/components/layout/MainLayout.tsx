@@ -24,6 +24,7 @@ const MainLayout = () => {
   const location = useLocation()
   const { user, logout } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
+  const [openKeys, setOpenKeys] = useState<string[]>([]) 
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
@@ -73,6 +74,16 @@ const MainLayout = () => {
       key: '/admin',
       icon: <SettingOutlined />,
       label: '系统管理',
+      children: [
+        {
+          key: '/admin/users',
+          label: '用户管理',
+        },
+        {
+          key: '/admin/roles',
+          label: '角色管理',
+        },
+      ],
     },
   ]
 
@@ -85,6 +96,8 @@ const MainLayout = () => {
     if (path.startsWith('/knowledge-bases')) return '/knowledge-bases'
     if (path.startsWith('/notifications')) return '/notifications'
     if (path.startsWith('/progress')) return '/progress'
+    if (path.startsWith('/templates')) return '/templates'
+    if (path.startsWith('/admin')) return '/admin/users'
     return path
   }
 
@@ -122,6 +135,8 @@ const MainLayout = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[getSelectedKey()]}
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
         />

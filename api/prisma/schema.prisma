@@ -61,6 +61,10 @@ model ProcessDefinition {
   version     Int      @default(1)
   graphJson   Json     @map("graph_json")
   status      String   @default("draft")
+  description String?
+  category    String?
+  isTemplate  Boolean  @default(false) @map("is_template")
+  isPreset    Boolean  @default(false) @map("is_preset")
   createdBy   String?  @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")

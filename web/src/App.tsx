@@ -16,6 +16,9 @@ import KnowledgeBaseListPage from './pages/knowledge-base/KnowledgeBaseListPage'
 import ProgressListPage from './pages/progress/ProgressListPage'
 import ProgressDetailPage from './pages/progress/ProgressDetailPage'
 import NotificationListPage from './pages/notifications/NotificationListPage'
+import TemplateMarketPage from './pages/template/TemplateMarketPage'
+import UserManagementPage from './pages/admin/UserManagementPage'
+import RoleManagementPage from './pages/admin/RoleManagementPage'
 
 function App() {
   return (
@@ -52,6 +55,10 @@ function App() {
             <Route path="progress" element={<ProgressListPage />} />
             <Route path="progress/:id" element={<ProgressDetailPage />} />
             <Route path="notifications" element={<NotificationListPage />} />
+            <Route path="templates" element={<TemplateMarketPage />} />
+            <Route path="admin" element={<Navigate to="/admin/users" replace />} />
+            <Route path="admin/users" element={<UserManagementPage />} />
+            <Route path="admin/roles" element={<RoleManagementPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

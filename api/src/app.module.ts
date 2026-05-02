@@ -11,6 +11,9 @@ import { NodeInstancesModule } from './node-instances/node-instances.module';
 import { TasksModule } from './tasks/tasks.module';
 import { KnowledgeBasesModule } from './knowledge-bases/knowledge-bases.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { TemplatesModule } from './templates/templates.module';
+import { RolesModule } from './roles/roles.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 import { QueueModule } from './queue/queue.module';
 import { WsModule } from './ws/ws.module';
 
@@ -32,6 +35,9 @@ import { WsModule } from './ws/ws.module';
     TasksModule,
     KnowledgeBasesModule,
     NotificationsModule,
+    TemplatesModule,
+    RolesModule,
+    AuditLogModule,
   ],
 })
 export class AppModule {}
