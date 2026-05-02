@@ -4,6 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditLogService } from '../audit-log/audit-log.service'
 import { NodeInstancesService } from '../node-instances/node-instances.service'
 
 @Injectable()
@@ -11,6 +12,7 @@ export class TasksService {
   constructor(
     private prisma: PrismaService,
     private nodeInstancesService: NodeInstancesService,
+    private auditLog: AuditLogService,
   ) {}
 
   async findAll(query: { type?: string; status?: string; page: number; pageSize: number }, userId: string) {
@@ -124,6 +126,14 @@ export class TasksService {
       nodeInstanceId,
     )
 
+    await this.auditLog.record({
+      userId,
+      action: 'approve',
+      resourceType: 'node_instance',
+      resourceId: nodeInstanceId,
+      details: { comment, instanceId: task.nodeInstance.instance.id },
+    })
+
     return { status: 'completed', message: '审批通过' }
   }
 
@@ -158,6 +168,14 @@ export class TasksService {
         },
       }),
     ])
+
+    await this.auditLog.record({
+      userId,
+      action: 'reject',
+      resourceType: 'node_instance',
+      resourceId: nodeInstanceId,
+      details: { comment },
+    })
 
     return { status: 'in_progress', message: '已驳回，等待员工修改后重新提交' }
   }

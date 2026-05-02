@@ -4,11 +4,15 @@ import {
   ConflictException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditLogService } from '../audit-log/audit-log.service'
 import * as bcrypt from 'bcrypt'
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   async findAll(query: { page: number; pageSize: number; keyword?: string }) {
     const { page, pageSize, keyword } = query
@@ -78,7 +82,7 @@ export class UsersService {
     }
   }
 
-  async create(dto: { name: string; email: string; password: string; roleIds?: string[] }) {
+  async create(dto: { name: string; email: string; password: string; roleIds?: string[] }, actorUserId: string) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } })
     if (existing) throw new ConflictException('邮箱已被注册')
 
@@ -99,10 +103,18 @@ export class UsersService {
       })
     }
 
+    await this.auditLog.record({
+      userId: actorUserId,
+      action: 'create_user',
+      resourceType: 'user',
+      resourceId: user.id,
+      details: { name: user.name, email: user.email },
+    })
+
     return this.findOne(user.id)
   }
 
-  async update(id: string, dto: { name?: string; email?: string; password?: string; status?: string; roleIds?: string[] }) {
+  async update(id: string, dto: { name?: string; email?: string; password?: string; status?: string; roleIds?: string[] }, actorUserId: string) {
     const user = await this.prisma.user.findUnique({ where: { id } })
     if (!user) throw new NotFoundException('用户不存在')
 
@@ -129,13 +141,30 @@ export class UsersService {
       }
     }
 
+    await this.auditLog.record({
+      userId: actorUserId,
+      action: 'update_user',
+      resourceType: 'user',
+      resourceId: id,
+      details: { ...dto, password: dto.password ? '***' : undefined },
+    })
+
     return this.findOne(id)
   }
 
-  async remove(id: string) {
+  async remove(id: string, actorUserId: string) {
     const user = await this.prisma.user.findUnique({ where: { id } })
     if (!user) throw new NotFoundException('用户不存在')
     await this.prisma.user.delete({ where: { id } })
+
+    await this.auditLog.record({
+      userId: actorUserId,
+      action: 'delete_user',
+      resourceType: 'user',
+      resourceId: id,
+      details: { name: user.name, email: user.email },
+    })
+
     return { success: true }
   }
 }

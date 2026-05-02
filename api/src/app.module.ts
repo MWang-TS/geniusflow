@@ -14,6 +14,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { TemplatesModule } from './templates/templates.module';
 import { RolesModule } from './roles/roles.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { AiReportsModule } from './ai-reports/ai-reports.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 import { QueueModule } from './queue/queue.module';
 import { WsModule } from './ws/ws.module';
 
@@ -38,6 +40,8 @@ import { WsModule } from './ws/ws.module';
     TemplatesModule,
     RolesModule,
     AuditLogModule,
+    AiReportsModule,
+    SchedulerModule,
   ],
 })
 export class AppModule {}

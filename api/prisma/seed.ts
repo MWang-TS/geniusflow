@@ -53,7 +53,117 @@ async function main() {
     });
   }
 
-  console.log('Seed completed');
+  console.log('Seed completed')
+
+  // 创建预设模板
+  const templateData = [
+    {
+      name: '咨询项目标准流程',
+      description: '适用于IT咨询项目的标准交付流程，包含需求调研、方案设计、交付验收三个阶段',
+      category: '咨询',
+      nodes: [
+        { id: 'tpl-start', type: 'start', nodeName: '开始', sortOrder: 0 },
+        { id: 'tpl-1', type: 'task', nodeName: '需求调研', sortOrder: 1 },
+        { id: 'tpl-2', type: 'task', nodeName: '方案设计', sortOrder: 2 },
+        { id: 'tpl-3', type: 'task', nodeName: '交付验收', sortOrder: 3 },
+        { id: 'tpl-end', type: 'end', nodeName: '结束', sortOrder: 4 },
+      ],
+      edges: [
+        { id: 'tpl-e1', source: 'tpl-start', target: 'tpl-1' },
+        { id: 'tpl-e2', source: 'tpl-1', target: 'tpl-2' },
+        { id: 'tpl-e3', source: 'tpl-2', target: 'tpl-3' },
+        { id: 'tpl-e4', source: 'tpl-3', target: 'tpl-end' },
+      ],
+    },
+    {
+      name: '软件开发流程',
+      description: '标准软件开发流程，涵盖需求分析、开发、测试、上线各环节',
+      category: '研发',
+      nodes: [
+        { id: 'tpl2-start', type: 'start', nodeName: '开始', sortOrder: 0 },
+        { id: 'tpl2-1', type: 'task', nodeName: '需求分析', sortOrder: 1 },
+        { id: 'tpl2-2', type: 'task', nodeName: '技术设计', sortOrder: 2 },
+        { id: 'tpl2-3', type: 'task', nodeName: '编码开发', sortOrder: 3 },
+        { id: 'tpl2-4', type: 'task', nodeName: '测试验证', sortOrder: 4 },
+        { id: 'tpl2-5', type: 'task', nodeName: '上线部署', sortOrder: 5 },
+        { id: 'tpl2-end', type: 'end', nodeName: '结束', sortOrder: 6 },
+      ],
+      edges: [
+        { id: 'tpl2-e1', source: 'tpl2-start', target: 'tpl2-1' },
+        { id: 'tpl2-e2', source: 'tpl2-1', target: 'tpl2-2' },
+        { id: 'tpl2-e3', source: 'tpl2-2', target: 'tpl2-3' },
+        { id: 'tpl2-e4', source: 'tpl2-3', target: 'tpl2-4' },
+        { id: 'tpl2-e5', source: 'tpl2-4', target: 'tpl2-5' },
+        { id: 'tpl2-e6', source: 'tpl2-5', target: 'tpl2-end' },
+      ],
+    },
+    {
+      name: '合同审批流程',
+      description: '企业合同审批流程，包含起草、法务审核、财务审核、最终签批',
+      category: '行政',
+      nodes: [
+        { id: 'tpl3-start', type: 'start', nodeName: '开始', sortOrder: 0 },
+        { id: 'tpl3-1', type: 'task', nodeName: '合同起草', sortOrder: 1 },
+        { id: 'tpl3-2', type: 'task', nodeName: '法务审核', sortOrder: 2 },
+        { id: 'tpl3-3', type: 'task', nodeName: '财务审核', sortOrder: 3 },
+        { id: 'tpl3-4', type: 'task', nodeName: '领导签批', sortOrder: 4 },
+        { id: 'tpl3-end', type: 'end', nodeName: '结束', sortOrder: 5 },
+      ],
+      edges: [
+        { id: 'tpl3-e1', source: 'tpl3-start', target: 'tpl3-1' },
+        { id: 'tpl3-e2', source: 'tpl3-1', target: 'tpl3-2' },
+        { id: 'tpl3-e3', source: 'tpl3-2', target: 'tpl3-3' },
+        { id: 'tpl3-e4', source: 'tpl3-3', target: 'tpl3-4' },
+        { id: 'tpl3-e5', source: 'tpl3-4', target: 'tpl3-end' },
+      ],
+    },
+  ]
+
+  const defaultInputSpec = { dataSchema: [], acceptanceCriteria: '', source: 'manual', timeConstraint: { daysFromStart: 1 } }
+  const defaultActionSpec = { instructions: '请填写', requirements: '', aiAssistance: [], timeConstraint: { estimatedDays: 1 } }
+  const defaultOutputSpec = { deliverables: [], qualityStandard: '', acceptanceCondition: '', timeConstraint: { daysFromStart: 2 } }
+  const defaultAiConfig = { inspector: { enabled: false, mode: 'normal', promptTemplate: '' }, assistant: { enabled: false, promptTemplate: '' } }
+  const defaultProgressConfig = { plannedDuration: 2, isMilestone: false, needApproval: true, requireAiReportBeforeApproval: false }
+
+  for (const tpl of templateData) {
+    const existing = await prisma.processDefinition.findFirst({
+      where: { name: tpl.name, isTemplate: true },
+    })
+    if (existing) continue
+
+    const def = await prisma.processDefinition.create({
+      data: {
+        name: tpl.name,
+        description: tpl.description,
+        category: tpl.category,
+        isTemplate: true,
+        isPreset: true,
+        status: 'published',
+        version: 1,
+        graphJson: { nodes: tpl.nodes, edges: tpl.edges },
+      },
+    })
+
+    for (const node of tpl.nodes) {
+      const isStartOrEnd = node.type === 'start' || node.type === 'end'
+      await prisma.nodeDefinition.create({
+        data: {
+          id: node.id,
+          processId: def.id,
+          nodeName: node.nodeName,
+          nodeType: node.type,
+          sortOrder: node.sortOrder,
+          inputSpec: isStartOrEnd ? {} : defaultInputSpec,
+          actionSpec: isStartOrEnd ? {} : defaultActionSpec,
+          outputSpec: isStartOrEnd ? {} : defaultOutputSpec,
+          aiConfig: isStartOrEnd ? { inspector: { enabled: false }, assistant: { enabled: false } } : defaultAiConfig,
+          progressConfig: isStartOrEnd ? { plannedDuration: 0, isMilestone: false, needApproval: false, requireAiReportBeforeApproval: false } : defaultProgressConfig,
+        },
+      })
+    }
+  }
+
+  console.log('Seed templates completed')
 }
 
 main()

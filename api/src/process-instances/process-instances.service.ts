@@ -4,11 +4,15 @@ import {
   ConflictException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditLogService } from '../audit-log/audit-log.service'
 import { CreateProcessInstanceDto } from './dto/create-process-instance.dto'
 
 @Injectable()
 export class ProcessInstancesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   async create(dto: CreateProcessInstanceDto, userId: string) {
     const definition = await this.prisma.processDefinition.findUnique({
@@ -121,7 +125,15 @@ export class ProcessInstancesService {
       })
     }
 
-    return this.findOne(instance.id)
+    const result = await this.findOne(instance.id)
+    await this.auditLog.record({
+      userId,
+      action: 'create_instance',
+      resourceType: 'process_instance',
+      resourceId: instance.id,
+      details: { definitionId: definition.id, definitionName: definition.name },
+    })
+    return result
   }
 
   async findAll(query: { page: number; pageSize: number; status?: string }) {
@@ -257,7 +269,7 @@ export class ProcessInstancesService {
     return this.getGanttData(id)
   }
 
-  async terminate(id: string, reason: string) {
+  async terminate(id: string, reason: string, userId: string) {
     const instance = await this.prisma.processInstance.findUnique({
       where: { id },
     })
@@ -304,6 +316,14 @@ export class ProcessInstancesService {
         },
       })
     }
+
+    await this.auditLog.record({
+      userId,
+      action: 'terminate_instance',
+      resourceType: 'process_instance',
+      resourceId: id,
+      details: { reason, definitionId: instance.definitionId },
+    })
 
     return { success: true, status: 'terminated' }
   }

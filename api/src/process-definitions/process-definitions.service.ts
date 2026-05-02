@@ -4,11 +4,15 @@ import {
   ConflictException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditLogService } from '../audit-log/audit-log.service'
 import { CreateProcessDefinitionDto, UpdateProcessDefinitionDto, QueryProcessDefinitionDto } from './dto/create-process-definition.dto'
 
 @Injectable()
 export class ProcessDefinitionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   async create(dto: CreateProcessDefinitionDto, userId: string) {
     const { name, graphJson } = dto
@@ -127,7 +131,7 @@ export class ProcessDefinitionsService {
     return { success: true }
   }
 
-  async publish(id: string) {
+  async publish(id: string, userId: string) {
     const definition = await this.findOne(id)
 
     if (definition.status === 'published') {
@@ -139,6 +143,14 @@ export class ProcessDefinitionsService {
     await this.prisma.processDefinition.update({
       where: { id },
       data: { status: 'published' },
+    })
+
+    await this.auditLog.record({
+      userId,
+      action: 'publish_process',
+      resourceType: 'process_definition',
+      resourceId: id,
+      details: { name: definition.name, version: definition.version },
     })
 
     return {

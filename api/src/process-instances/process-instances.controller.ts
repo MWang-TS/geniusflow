@@ -46,8 +46,8 @@ export class ProcessInstancesController {
 
   @Post(':id/terminate')
   @Roles('manager', 'admin')
-  terminate(@Param('id') id: string, @Body() dto: TerminateProcessInstanceDto) {
-    return this.service.terminate(id, dto.reason)
+  terminate(@Param('id') id: string, @Body() dto: TerminateProcessInstanceDto, @Req() req: any) {
+    return this.service.terminate(id, dto.reason, req.user.userId)
   }
 
   @Post(':id/baseline')

@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Put, Delete, Body, Param, Req, UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/roles.guard'
@@ -23,20 +23,21 @@ export class RolesController {
   }
 
   @Post()
-  create(@Body() dto: { name: string; description?: string; permissions?: string[] }) {
-    return this.service.create(dto)
+  create(@Body() dto: { name: string; description?: string; permissions?: string[] }, @Req() req: any) {
+    return this.service.create(dto, req.user.userId)
   }
 
   @Put(':id')
   update(
     @Param('id') id: string,
     @Body() dto: { name?: string; description?: string; permissions?: string[] },
+    @Req() req: any,
   ) {
-    return this.service.update(id, dto)
+    return this.service.update(id, dto, req.user.userId)
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id)
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.service.remove(id, req.user.userId)
   }
 }

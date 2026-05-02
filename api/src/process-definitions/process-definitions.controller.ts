@@ -51,7 +51,7 @@ export class ProcessDefinitionsController {
 
   @Post(':id/publish')
   @Roles('designer', 'admin')
-  publish(@Param('id') id: string) {
-    return this.service.publish(id)
+  publish(@Param('id') id: string, @Req() req: any) {
+    return this.service.publish(id, req.user.userId)
   }
 }
