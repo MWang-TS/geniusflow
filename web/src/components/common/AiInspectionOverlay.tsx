@@ -1,4 +1,4 @@
-import { Modal, Tag, List, Typography, Progress } from 'antd'
+import { Modal, Tag, List, Typography, Progress, Button } from 'antd'
 import {
   LoadingOutlined,
   CheckCircleOutlined,
@@ -150,33 +150,8 @@ const AiInspectionOverlay: React.FC<AiInspectionOverlayProps> = ({
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                border: '1px solid #d9d9d9',
-                background: '#fff',
-                padding: '4px 15px',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
-            >
-              关闭
-            </button>
-            <button
-              type="button"
-              onClick={onRetry}
-              style={{
-                border: 'none',
-                background: '#1677ff',
-                color: '#fff',
-                padding: '4px 15px',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
-            >
-              返回修改
-            </button>
+            <Button onClick={onClose}>关闭</Button>
+            <Button type="primary" onClick={onRetry}>返回修改</Button>
           </div>
         )}
       </div>

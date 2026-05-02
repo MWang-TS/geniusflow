@@ -42,7 +42,7 @@ const MyTasksPage: React.FC = () => {
     [filterType, filterStatus, message],
   )
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData(1, pagination.pageSize) }, [filterType, filterStatus])
 
   const columns: ColumnsType<TaskListItem> = [
     {
@@ -126,14 +126,14 @@ const MyTasksPage: React.FC = () => {
         <Space>
           <Select placeholder="任务类型" allowClear style={{ width: 100 }}
             value={filterType}
-            onChange={(v) => { setFilterType(v); setTimeout(() => fetchData(1, pagination.pageSize), 0) }}
+            onChange={(v) => setFilterType(v)}
             options={[
               { label: '执行', value: 'execute' },
               { label: '审批', value: 'approve' },
             ]} />
           <Select placeholder="状态" allowClear style={{ width: 100 }}
             value={filterStatus}
-            onChange={(v) => { setFilterStatus(v); setTimeout(() => fetchData(1, pagination.pageSize), 0) }}
+            onChange={(v) => setFilterStatus(v)}
             options={[
               { label: '待处理', value: 'pending' },
               { label: '已完成', value: 'completed' },

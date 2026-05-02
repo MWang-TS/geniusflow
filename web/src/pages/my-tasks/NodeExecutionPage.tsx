@@ -35,6 +35,7 @@ const NodeExecutionPage: React.FC = () => {
 
   useEffect(() => {
     if (!socket.current || !nodeInstanceId) return
+    const s = socket.current
 
     const handleAiResult = (data: AiInspectionResult) => {
       if (data.nodeInstanceId !== nodeInstanceId) return
@@ -46,11 +47,11 @@ const NodeExecutionPage: React.FC = () => {
       }
     }
 
-    socket.current.on('ai:result', handleAiResult)
+    s.on('ai:result', handleAiResult)
     return () => {
-      socket.current?.off('ai:result', handleAiResult)
+      s.off('ai:result', handleAiResult)
     }
-  }, [socket.current, nodeInstanceId])
+  }, [socket, nodeInstanceId])
 
   useEffect(() => {
     if (!nodeInstanceId) return
@@ -85,15 +86,17 @@ const NodeExecutionPage: React.FC = () => {
 
   const handleProgressChange = useCallback(
     async (val: number) => {
+      const prev = percentComplete
       setPercentComplete(val)
       if (!nodeInstanceId) return
       try {
         await nodeInstanceApi.updateProgress(nodeInstanceId, val)
       } catch {
-        /* silent */
+        setPercentComplete(prev)
+        message.error('进度更新失败')
       }
     },
-    [nodeInstanceId],
+    [nodeInstanceId, percentComplete, message],
   )
 
   const handleSubmit = useCallback(async () => {

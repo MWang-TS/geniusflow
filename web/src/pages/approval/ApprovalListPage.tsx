@@ -34,7 +34,7 @@ const ApprovalListPage: React.FC = () => {
     [filterStatus, message],
   )
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData(1, pagination.pageSize) }, [filterStatus])
 
   const columns: ColumnsType<TaskListItem> = [
     {
@@ -95,7 +95,7 @@ const ApprovalListPage: React.FC = () => {
       extra={
         <Space>
           <Select style={{ width: 100 }} value={filterStatus}
-            onChange={(v) => { setFilterStatus(v); setTimeout(() => fetchData(1, pagination.pageSize), 0) }}
+            onChange={(v) => setFilterStatus(v)}
             options={[
               { label: '待审批', value: 'pending' },
               { label: '已处理', value: 'completed' },
