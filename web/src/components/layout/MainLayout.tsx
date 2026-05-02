@@ -97,6 +97,8 @@ const MainLayout = () => {
     if (path.startsWith('/notifications')) return '/notifications'
     if (path.startsWith('/progress')) return '/progress'
     if (path.startsWith('/templates')) return '/templates'
+    if (path.startsWith('/admin/users')) return '/admin/users'
+    if (path.startsWith('/admin/roles')) return '/admin/roles'
     if (path.startsWith('/admin')) return '/admin/users'
     return path
   }

@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditLogService } from '../audit-log/audit-log.service'
 
 @Injectable()
 export class TemplatesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   async findAll(query: { page: number; pageSize: number; category?: string }) {
     const { page, pageSize, category } = query
@@ -46,36 +50,49 @@ export class TemplatesService {
     if (!template.isTemplate) throw new NotFoundException('该流程不是模板')
 
     const cloneName = `${template.name} (副本)`
-    const newDef = await this.prisma.processDefinition.create({
-      data: {
-        name: cloneName,
-        version: 1,
-        graphJson: template.graphJson as object,
-        status: 'draft',
-        description: template.description,
-        category: template.category,
-        isTemplate: false,
-        isPreset: false,
-        createdBy: userId,
-      },
-    })
 
-    for (const node of template.nodes) {
-      await this.prisma.nodeDefinition.create({
+    const result = await this.prisma.$transaction(async (tx) => {
+      const newDef = await tx.processDefinition.create({
         data: {
-          processId: newDef.id,
-          nodeName: node.nodeName,
-          nodeType: node.nodeType,
-          inputSpec: node.inputSpec as object,
-          actionSpec: node.actionSpec as object,
-          outputSpec: node.outputSpec as object,
-          aiConfig: node.aiConfig as object,
-          progressConfig: node.progressConfig as object,
-          sortOrder: node.sortOrder,
+          name: cloneName,
+          version: 1,
+          graphJson: template.graphJson as object,
+          status: 'draft',
+          description: template.description,
+          category: template.category,
+          isTemplate: false,
+          isPreset: false,
+          createdBy: userId,
         },
       })
-    }
 
-    return { id: newDef.id, name: newDef.name, status: newDef.status }
+      for (const node of template.nodes) {
+        await tx.nodeDefinition.create({
+          data: {
+            processId: newDef.id,
+            nodeName: node.nodeName,
+            nodeType: node.nodeType,
+            inputSpec: node.inputSpec as object,
+            actionSpec: node.actionSpec as object,
+            outputSpec: node.outputSpec as object,
+            aiConfig: node.aiConfig as object,
+            progressConfig: node.progressConfig as object,
+            sortOrder: node.sortOrder,
+          },
+        })
+      }
+
+      return newDef
+    })
+
+    await this.auditLog.record({
+      userId,
+      action: 'clone_template',
+      resourceType: 'process_definition',
+      resourceId: id,
+      details: { clonedId: result.id, name: result.name },
+    })
+
+    return { id: result.id, name: result.name, status: result.status }
   }
 }

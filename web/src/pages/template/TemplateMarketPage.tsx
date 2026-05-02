@@ -10,6 +10,7 @@ const TemplateMarketPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 })
   const [cloning, setCloning] = useState<string | null>(null)
+  const [keyword, setKeyword] = useState('')
 
   const fetchData = useCallback(async (page = 1, pageSize = 20) => {
     setLoading(true)
@@ -25,6 +26,19 @@ const TemplateMarketPage: React.FC = () => {
   }, [message])
 
   useEffect(() => { fetchData() }, [])
+
+  const handleSearch = (value: string) => {
+    const filtered = data.filter((t) =>
+      t.name.toLowerCase().includes(value.toLowerCase()) ||
+      (t.description && t.description.toLowerCase().includes(value.toLowerCase()))
+    )
+    if (!value) {
+      fetchData()
+    } else {
+      setData(filtered)
+    }
+    setKeyword(value)
+  }
 
   const handleClone = async (id: string) => {
     setCloning(id)
@@ -74,7 +88,7 @@ const TemplateMarketPage: React.FC = () => {
   return (
     <Card title="模板市场" extra={
       <Space>
-        <Input.Search placeholder="搜索模板" style={{ width: 200 }} />
+        <Input.Search placeholder="搜索模板" style={{ width: 200 }} value={keyword} onChange={(e) => handleSearch(e.target.value)} />
         <Button icon={<ReloadOutlined />} onClick={() => fetchData(1, pagination.pageSize)} />
       </Space>
     }>

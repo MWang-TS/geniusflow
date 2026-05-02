@@ -5,6 +5,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { usersApi, type UserItem } from '../../api/users'
+import { rolesApi, type RoleItem } from '../../api/roles'
 
 const statusTags: Record<string, { color: string; label: string }> = {
   active: { color: 'green', label: '正常' },
@@ -20,6 +21,7 @@ const UserManagementPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserItem | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [roleOptions, setRoleOptions] = useState<Array<{ label: string; value: string }>>([])
 
   const fetchData = useCallback(async (page = 1, pageSize = 20) => {
     setLoading(true)
@@ -35,6 +37,13 @@ const UserManagementPage: React.FC = () => {
   }, [message])
 
   useEffect(() => { fetchData() }, [])
+
+  useEffect(() => {
+    rolesApi.list().then((res) => {
+      const roles: RoleItem[] = res.data || []
+      setRoleOptions(roles.map((r) => ({ label: r.description || r.name, value: r.id })))
+    }).catch(() => {})
+  }, [])
 
   const handleCreate = () => {
     setEditingUser(null)
@@ -161,12 +170,7 @@ const UserManagementPage: React.FC = () => {
             </Form.Item>
           )}
           <Form.Item name="roleIds" label="角色">
-            <Select mode="multiple" placeholder="选择角色" options={[
-              { label: '设计者', value: 'designer' },
-              { label: '员工', value: 'employee' },
-              { label: '管理者', value: 'manager' },
-              { label: '管理员', value: 'admin' },
-            ]} />
+            <Select mode="multiple" placeholder="选择角色" options={roleOptions} />
           </Form.Item>
         </Form>
       </Modal>
