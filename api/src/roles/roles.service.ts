@@ -108,4 +108,51 @@ export class RolesService {
 
     return { success: true }
   }
+
+  async getRoutePermissions(id: string) {
+    const role = await this.prisma.role.findUnique({ where: { id }, select: { id: true, name: true, routePermissions: true } })
+    if (!role) throw new NotFoundException('角色不存在')
+    return role
+  }
+
+  async updateRoutePermissions(id: string, routes: string[], actorUserId: string) {
+    const role = await this.prisma.role.findUnique({ where: { id } })
+    if (!role) throw new NotFoundException('角色不存在')
+
+    const updated = await this.prisma.role.update({
+      where: { id },
+      data: { routePermissions: routes },
+      select: { id: true, name: true, routePermissions: true },
+    })
+
+    await this.auditLog.record({
+      userId: actorUserId,
+      action: 'update_role_routes',
+      resourceType: 'role',
+      resourceId: id,
+      details: { routes },
+    })
+
+    return updated
+  }
+
+  /** 获取用户可访问的路由（所有角色的路由权限并集；admin角色返回 null 表示全部可见） */
+  async getUserRoutePermissions(userId: string): Promise<string[] | null> {
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: { select: { name: true, routePermissions: true } } },
+    })
+
+    const roleNames = userRoles.map((ur) => ur.role.name)
+    if (roleNames.includes('admin')) return null // admin 全部可见
+
+    const allRoutes = new Set<string>()
+    for (const ur of userRoles) {
+      const routes = ur.role.routePermissions as string[]
+      if (Array.isArray(routes)) {
+        routes.forEach((r) => allRoutes.add(r))
+      }
+    }
+    return Array.from(allRoutes)
+  }
 }

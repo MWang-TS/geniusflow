@@ -45,6 +45,14 @@ export class UpdateNodeDefinitionDto {
       enabled?: boolean
       promptTemplate?: string
     }
+    inputAgent?: {
+      enabled?: boolean
+      promptTemplate?: string
+    }
+    outputAgent?: {
+      enabled?: boolean
+      promptTemplate?: string
+    }
   }
 
   @IsOptional()

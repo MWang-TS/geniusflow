@@ -64,4 +64,26 @@ export class AuthService {
       throw new UnauthorizedException('Token 无效或已过期');
     }
   }
+
+  /** 获取用户可访问的路由列表（admin 返回 null 表示全部可见） */
+  async getUserRoutePermissions(userId: string): Promise<{ routes: string[] | null }> {
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: { select: { name: true, routePermissions: true } } },
+    });
+
+    const roleNames = userRoles.map((ur) => ur.role.name);
+    if (roleNames.includes('admin')) {
+      return { routes: null }; // null = 全部可见
+    }
+
+    const allRoutes = new Set<string>();
+    for (const ur of userRoles) {
+      const routes = ur.role.routePermissions as string[];
+      if (Array.isArray(routes)) {
+        routes.forEach((r) => allRoutes.add(r));
+      }
+    }
+    return { routes: Array.from(allRoutes) };
+  }
 }

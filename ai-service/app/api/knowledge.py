@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from psycopg2.extras import RealDictCursor
 
 from app.core.config import settings
+from app.services.document_parser import parse_file_bytes, parse_file_path, chunk_text
 
 router = APIRouter()
 
@@ -120,3 +121,45 @@ async def search(request: SearchRequest):
                 conn.close()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+# ── Parse endpoint ──────────────────────────────────────────────────────────
+
+class ParseByPathRequest(BaseModel):
+    filePath: str
+    fileName: str
+
+
+class ParseResponse(BaseModel):
+    text: str
+    chunks: List[str]
+    chunkCount: int
+
+
+@router.post("/parse-path", response_model=ParseResponse)
+async def parse_by_path(request: ParseByPathRequest):
+    """Parse a document from a local file path (shared volume) and return text + chunks."""
+    try:
+        text = parse_file_path(request.filePath, request.fileName)
+        chunks = chunk_text(text)
+        return ParseResponse(text=text, chunks=chunks, chunkCount=len(chunks))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File not found: {request.filePath}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Parse failed: {str(e)}")
+
+
+@router.post("/parse-upload", response_model=ParseResponse)
+async def parse_upload(file: UploadFile = File(...)):
+    """Parse an uploaded file and return text + chunks."""
+    try:
+        data = await file.read()
+        text = parse_file_bytes(data, file.filename or "unknown")
+        chunks = chunk_text(text)
+        return ParseResponse(text=text, chunks=chunks, chunkCount=len(chunks))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Parse failed: {str(e)}")

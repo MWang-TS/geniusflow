@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, theme, Dropdown, Avatar, Space, Typography } from 'antd'
 import {
@@ -22,14 +22,19 @@ const { Text } = Typography
 const MainLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuthStore()
+  const { user, logout, allowedRoutes } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
   const [openKeys, setOpenKeys] = useState<string[]>([]) 
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
 
-  const menuItems = [
+  const isRouteVisible = (path: string) => {
+    if (allowedRoutes === null) return true // admin 全部可见
+    return allowedRoutes.some((r) => path === r || path.startsWith(r + '/'))
+  }
+
+  const allMenuItems = [
     {
       key: '/processes',
       icon: <NodeIndexOutlined />,
@@ -75,17 +80,26 @@ const MainLayout = () => {
       icon: <SettingOutlined />,
       label: '系统管理',
       children: [
-        {
-          key: '/admin/users',
-          label: '用户管理',
-        },
-        {
-          key: '/admin/roles',
-          label: '角色管理',
-        },
+        { key: '/admin/users', label: '用户管理' },
+        { key: '/admin/roles', label: '角色管理' },
+        { key: '/admin/ai-settings', label: 'AI 配置' },
       ],
     },
   ]
+
+  const menuItems = useMemo(() => {
+    return allMenuItems
+      .map((item) => {
+        if (item.children) {
+          const visibleChildren = item.children.filter((c) => isRouteVisible(c.key))
+          if (visibleChildren.length === 0) return null
+          return { ...item, children: visibleChildren }
+        }
+        return isRouteVisible(item.key) ? item : null
+      })
+      .filter(Boolean) as typeof allMenuItems
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowedRoutes])
 
   const getSelectedKey = () => {
     const path = location.pathname
@@ -99,6 +113,7 @@ const MainLayout = () => {
     if (path.startsWith('/templates')) return '/templates'
     if (path.startsWith('/admin/users')) return '/admin/users'
     if (path.startsWith('/admin/roles')) return '/admin/roles'
+    if (path.startsWith('/admin/ai-settings')) return '/admin/ai-settings'
     if (path.startsWith('/admin')) return '/admin/users'
     return path
   }

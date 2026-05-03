@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import Queue from 'bull'
+import * as Bull from 'bull'
 import { PrismaService } from '../prisma/prisma.service'
 import { WsGateway } from '../ws/ws.gateway'
 import { QueueService, type AiInspectorJobData } from './queue.service'
@@ -35,15 +35,15 @@ export class AiInspectorProcessor {
 
   onModuleInit() {
     const queue = this.queueService.getQueue('ai-inspector')
-    queue.process(2, async (job: Queue.Job<AiInspectorJobData>) => {
+    queue.process(2, async (job: Bull.Job<AiInspectorJobData>) => {
       return this.processInspectorJob(job)
     })
 
-    queue.on('completed', (job: Queue.Job<AiInspectorJobData>, result: InspectorResult) => {
+    queue.on('completed', (job: Bull.Job<AiInspectorJobData>, result: InspectorResult) => {
       this.logger.log(`AI inspection completed for node ${job.data.nodeInstanceId}: passed=${result.passed}`)
     })
 
-    queue.on('failed', (job: Queue.Job<AiInspectorJobData>, err: Error) => {
+    queue.on('failed', (job: Bull.Job<AiInspectorJobData>, err: Error) => {
       this.logger.error(`AI inspection failed for node ${job.data.nodeInstanceId}: ${err.message}`)
       this.handleFallback(job.data).catch((e) =>
         this.logger.error(`Fallback failed: ${e.message}`),
@@ -51,7 +51,7 @@ export class AiInspectorProcessor {
     })
   }
 
-  private async processInspectorJob(job: Queue.Job<AiInspectorJobData>): Promise<InspectorResult> {
+  private async processInspectorJob(job: Bull.Job<AiInspectorJobData>): Promise<InspectorResult> {
     const { nodeName, inputData, outputData, acceptanceCriteria, qualityStandard } = job.data
 
     try {
@@ -65,8 +65,8 @@ export class AiInspectorProcessor {
           nodeName,
           inputData,
           outputData,
-          acceptanceCriteria: acceptanceCriteria || '无',
-          qualityStandard: qualityStandard || '无',
+          acceptanceCriteria: acceptanceCriteria || '无特定要求',
+          qualityStandard: qualityStandard || '无特定要求',
         }),
         signal: controller.signal,
       })
@@ -198,7 +198,7 @@ export class AiInspectorProcessor {
         eventType: 'ai_fallback',
         fromStatus: 'ai_inspecting',
         toStatus: 'pending_approval',
-        details: { message: 'AI 校验失败，已降级为人工审批' },
+        details: { message: 'AI 校验失败，已降级为人工审核' },
       },
     })
 
@@ -223,7 +223,7 @@ export class AiInspectorProcessor {
       status: 'pending_approval',
       passed: true,
       isFallback: true,
-      message: 'AI 校验超时，已降级为人工审批',
+      message: 'AI 校验超时，已降级为人工审核',
     })
   }
 

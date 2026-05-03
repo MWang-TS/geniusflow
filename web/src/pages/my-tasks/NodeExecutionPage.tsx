@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Collapse, Descriptions, Tag, Slider, Button, Space, Spin, App, Divider } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, SendOutlined, RobotOutlined } from '@ant-design/icons'
 import { nodeInstanceApi, type NodeInstanceDetail } from '../../api/node-instance'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { useAuthStore } from '../../stores/auth.store'
 import DynamicFormFill from '../../components/common/DynamicFormFill'
 import AiInspectionOverlay, { type AiInspectionResult } from '../../components/common/AiInspectionOverlay'
+import { useAiAssistantStore } from '../../stores/ai-assistant.store'
 
 const statusMap: Record<string, { color: string; label: string }> = {
   waiting: { color: 'default', label: '等待中' },
@@ -32,6 +33,7 @@ const NodeExecutionPage: React.FC = () => {
   const [percentComplete, setPercentComplete] = useState(0)
   const [aiResult, setAiResult] = useState<AiInspectionResult | null>(null)
   const [showAiOverlay, setShowAiOverlay] = useState(false)
+  const sendToAiAssistant = useAiAssistantStore((s) => s.sendMessage)
 
   useEffect(() => {
     if (!socket.current || !nodeInstanceId) return
@@ -142,7 +144,33 @@ const NodeExecutionPage: React.FC = () => {
   const inputSchema = (def.inputSpec as Record<string, unknown>)?.dataSchema as any[]
   const outputSchema = (def.outputSpec as Record<string, unknown>)?.deliverables as string[] | undefined
   const actionSpec = def.actionSpec as Record<string, unknown>
+  const inputSpec = def.inputSpec as Record<string, unknown> | undefined
   const isEditable = node.status === 'in_progress'
+
+  const nodeContext = {
+    nodeName: def.nodeName as string || '任务',
+    instructions: actionSpec?.instructions as string | undefined,
+    requirements: actionSpec?.requirements as string | undefined,
+    acceptanceCriteria: inputSpec?.acceptanceCriteria as string | undefined,
+    deliverables: outputSchema,
+    inputFields: (inputSpec?.dataSchema as Array<{ name: string; type: string; required?: boolean; description?: string }>) || [],
+  }
+
+  const handleAskAi = () => {
+    const nl = '\n'
+    const parts: string[] = [
+      `我正在执行任务【${nodeContext.nodeName}】，请为我提供完成指导，包括如何高质量完成本任务、需要注意的标准和要求。${nl}${nl}以下是任务详情：`,
+    ]
+    if (nodeContext.instructions) parts.push(`**行动说明：**${nl}${nodeContext.instructions}`)
+    if (nodeContext.requirements) parts.push(`**质量要求：**${nl}${nodeContext.requirements}`)
+    if (nodeContext.acceptanceCriteria) parts.push(`**验收标准：**${nl}${nodeContext.acceptanceCriteria}`)
+    if (nodeContext.deliverables?.length)
+      parts.push(`**需要交付的成果：**${nl}${nodeContext.deliverables.map((d) => `- ${d}`).join(nl)}`)
+    if (nodeContext.inputFields?.length)
+      parts.push(`**需要填写的输入字段：**${nl}${nodeContext.inputFields.map((f) => `- ${f.name}`).join(nl)}`)
+    parts.push('请给出详细的完成步骤和注意事项。')
+    sendToAiAssistant(parts.join(`${nl}${nl}`))
+  }
 
   const outputFields = (outputSchema || []).map((name) => ({
     name,
@@ -199,6 +227,16 @@ const NodeExecutionPage: React.FC = () => {
               </div>
             </div>
           )}
+          <div style={{ marginBottom: 16 }}>
+            <Button
+              icon={<RobotOutlined />}
+              type="dashed"
+              onClick={handleAskAi}
+              style={{ borderColor: '#1677ff', color: '#1677ff' }}
+            >
+              AI助手 - 获取任务完成指导
+            </Button>
+          </div>
           <Divider />
           <div style={{ fontWeight: 500, marginBottom: 8 }}>完成进度</div>
           <div style={{ padding: '0 8px' }}>

@@ -53,15 +53,19 @@ services:
         condition: service_healthy
     networks:
       - geniusflow-network
+    volumes:
+      - ./uploads:/app/uploads
 
   postgres:
-    image: ankane/pgvector:v0.6.0
+    image: pgvector/pgvector:pg16
     container_name: geniusflow-postgres
     restart: unless-stopped
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=geniusflow
+    ports:
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
@@ -76,6 +80,8 @@ services:
     image: redis:7-alpine
     container_name: geniusflow-redis
     restart: unless-stopped
+    ports:
+      - "6379:6379"
     volumes:
       - redis-data:/data
     networks:

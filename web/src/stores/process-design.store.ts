@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ProcessDefinition, GraphJson } from '../types/process'
+import type { ProcessDefinition, GraphJson, NodeDefinition } from '../types/process'
 import { processDefinitionApi } from '../api/process-definition'
 import { nodeDefinitionApi } from '../api/node-definition'
 
@@ -22,6 +22,7 @@ interface ProcessDesignState {
 
   selectNode: (id: string | null) => void
   updateGraph: (graphJson: GraphJson) => void
+  addNode: (nodeId: string, nodeType: 'start' | 'task' | 'end', label: string, graphJson: GraphJson) => void
   updateNodeData: (nodeId: string, data: Record<string, unknown>) => Promise<void>
 
   validate: () => ValidationResult
@@ -105,6 +106,34 @@ export const useProcessDesignStore = create<ProcessDesignState>((set, get) => ({
   },
 
   selectNode: (id: string | null) => set({ selectedNodeId: id }),
+
+  addNode: (nodeId: string, nodeType: 'start' | 'task' | 'end', label: string, graphJson: GraphJson) => {
+    const { currentProcess } = get()
+    if (!currentProcess) return
+    const now = new Date().toISOString()
+    const defaultAiConfig = { inspector: { enabled: false }, assistant: { enabled: false }, inputAgent: { enabled: false }, outputAgent: { enabled: false } }
+    const placeholder: NodeDefinition = {
+      id: nodeId,
+      processId: currentProcess.id,
+      nodeName: label,
+      nodeType,
+      inputSpec: {},
+      actionSpec: {},
+      outputSpec: {},
+      aiConfig: defaultAiConfig,
+      progressConfig: { plannedDuration: nodeType === 'task' ? 2 : 0, needApproval: nodeType === 'task', isMilestone: false, requireAiReportBeforeApproval: false },
+      sortOrder: currentProcess.nodes.length,
+      createdAt: now,
+      updatedAt: now,
+    }
+    set({
+      currentProcess: {
+        ...currentProcess,
+        graphJson,
+        nodes: [...currentProcess.nodes, placeholder],
+      },
+    })
+  },
 
   updateGraph: (graphJson: GraphJson) => {
     const { currentProcess } = get()

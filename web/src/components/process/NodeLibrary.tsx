@@ -22,34 +22,41 @@ const nodeTemplates: NodeTemplate[] = [
   { type: 'end', label: '结束', icon: <StopOutlined style={{ fontSize: 20 }} />, color: '#ff4d4f', bgColor: '#fff1f0' },
 ]
 
-const NodeLibrary: React.FC = () => {
+const NodeLibrary: React.FC<{ readOnly?: boolean }> = ({ readOnly = false }) => {
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
+    if (readOnly) return
     event.dataTransfer.setData('application/reactflow-type', nodeType)
     event.dataTransfer.effectAllowed = 'move'
   }
 
   return (
     <Card title="节点库" size="small" style={{ height: '100%' }}>
+      {readOnly && (
+        <div style={{ marginBottom: 8, fontSize: 12, color: '#faad14', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, padding: '4px 8px' }}>
+          已发布，不可添加节点
+        </div>
+      )}
       <Space direction="vertical" style={{ width: '100%' }} size="small">
         {nodeTemplates.map((template) => (
           <div
             key={template.type}
-            draggable
+            draggable={!readOnly}
             onDragStart={(e) => onDragStart(e, template.type)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 10,
               padding: '10px 14px',
-              background: template.bgColor,
-              border: `2px solid ${template.color}`,
+              background: readOnly ? '#fafafa' : template.bgColor,
+              border: `2px solid ${readOnly ? '#d9d9d9' : template.color}`,
               borderRadius: 8,
-              cursor: 'grab',
+              cursor: readOnly ? 'not-allowed' : 'grab',
               userSelect: 'none',
+              opacity: readOnly ? 0.5 : 1,
               transition: 'box-shadow 0.2s',
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'
+              if (!readOnly) (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.boxShadow = 'none'

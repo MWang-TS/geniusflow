@@ -28,11 +28,12 @@ model User {
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  permissions Json     @default("[]")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid())
+  name             String   @unique
+  description      String?
+  permissions      Json     @default("[]")
+  routePermissions Json     @default("[]") @map("route_permissions")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   userRoles     UserRole[]
   nodeInstances NodeInstance[]
@@ -283,4 +284,106 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model AiProvider {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  type        String   // openai | azure_openai | anthropic | ollama | custom
+  baseUrl     String?  @map("base_url")
+  apiKey      String?  @map("api_key")
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  extra       Json     @default("{}") // extra config like api_version, org_id etc
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  models AiModel[]
+
+  @@map("ai_providers")
+}
+
+model AiModel {
+  id           String   @id @default(uuid())
+  providerId   String   @map("provider_id")
+  name         String
+  modelId      String   @map("model_id")  // actual model name sent to API e.g. gpt-4o
+  type         String   // chat | embedding | rerank
+  isDefault    Boolean  @default(false) @map("is_default")
+  contextWindow Int?    @map("context_window")
+  maxTokens    Int?     @map("max_tokens")
+  isEnabled    Boolean  @default(true) @map("is_enabled")
+  extra        Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  provider  AiProvider  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  agentRoles AgentRole[]
+  fallbackChains ModelFallbackChain[]
+
+  @@unique([providerId, modelId, type])
+  @@map("ai_models")
+}
+
+model AgentSkill {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  type        String   // tool | retrieval | code_execution | custom
+  config      Json     @default("{}")  // e.g. tool call schema, API endpoint etc
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  agentRoleSkills AgentRoleSkill[]
+
+  @@map("agent_skills")
+}
+
+model AgentRole {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  description     String?
+  systemPrompt    String?  @map("system_prompt")
+  modelId         String?  @map("model_id")
+  temperature     Float    @default(0.7)
+  maxTokens       Int?     @map("max_tokens")
+  isEnabled       Boolean  @default(true) @map("is_enabled")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  model  AiModel?        @relation(fields: [modelId], references: [id])
+  skills AgentRoleSkill[]
+
+  @@map("agent_roles")
+}
+
+model AgentRoleSkill {
+  id          String   @id @default(uuid())
+  agentRoleId String   @map("agent_role_id")
+  skillId     String   @map("skill_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  agentRole AgentRole  @relation(fields: [agentRoleId], references: [id], onDelete: Cascade)
+  skill     AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([agentRoleId, skillId])
+  @@map("agent_role_skills")
+}
+
+/// Ordered fallback chain for a given model type (chat | embedding).
+/// When the primary model call fails, the AI service will try models in ascending sortOrder.
+model ModelFallbackChain {
+  id        String   @id @default(uuid())
+  modelType String   @map("model_type")  // 'chat' | 'embedding'
+  sortOrder Int      @map("sort_order")
+  modelId   String   @map("model_id")
+  isEnabled Boolean  @default(true) @map("is_enabled")
+  note      String?  // optional human-readable note
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  model AiModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@unique([modelType, sortOrder])
+  @@map("model_fallback_chains")
 }

@@ -7,9 +7,10 @@ import type { InputField } from '../../types/process'
 interface InputConfigFormProps {
   nodeId: string
   fields?: InputField[]
+  readOnly?: boolean
 }
 
-const InputConfigForm: React.FC<InputConfigFormProps> = ({ nodeId, fields = [] }) => {
+const InputConfigForm: React.FC<InputConfigFormProps> = ({ nodeId, fields = [], readOnly = false }) => {
   const updateNodeData = useProcessDesignStore((s) => s.updateNodeData)
   const { message } = App.useApp()
 
@@ -64,14 +65,16 @@ const InputConfigForm: React.FC<InputConfigFormProps> = ({ nodeId, fields = [] }
             <Input
               size="small"
               placeholder="字段名称"
+              disabled={readOnly}
               value={field.name}
-              onChange={(e) => handleUpdateField(index, { name: e.target.value })}
+              onChange={(e) => !readOnly && handleUpdateField(index, { name: e.target.value })}
               style={{ flex: 1 }}
             />
             <Select
               size="small"
+              disabled={readOnly}
               value={field.type}
-              onChange={(v) => handleUpdateField(index, { type: v as InputField['type'] })}
+              onChange={(v) => !readOnly && handleUpdateField(index, { type: v as InputField['type'] })}
               style={{ width: 90 }}
               options={[
                 { label: '文本', value: 'text' },
@@ -84,16 +87,18 @@ const InputConfigForm: React.FC<InputConfigFormProps> = ({ nodeId, fields = [] }
               type="text"
               size="small"
               danger
+              disabled={readOnly}
               icon={<DeleteOutlined />}
-              onClick={() => handleRemoveField(index)}
+              onClick={() => !readOnly && handleRemoveField(index)}
             />
           </div>
           <Space size="small">
             <span style={{ fontSize: 11, color: '#999' }}>必填</span>
             <Switch
               size="small"
+              disabled={readOnly}
               checked={field.required}
-              onChange={(v) => handleUpdateField(index, { required: v })}
+              onChange={(v) => !readOnly && handleUpdateField(index, { required: v })}
             />
           </Space>
         </div>
@@ -102,8 +107,9 @@ const InputConfigForm: React.FC<InputConfigFormProps> = ({ nodeId, fields = [] }
         type="dashed"
         size="small"
         block
+        disabled={readOnly}
         icon={<PlusOutlined />}
-        onClick={handleAddField}
+        onClick={() => !readOnly && handleAddField()}
       >
         添加输入字段
       </Button>

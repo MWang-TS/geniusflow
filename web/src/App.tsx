@@ -19,6 +19,8 @@ import NotificationListPage from './pages/notifications/NotificationListPage'
 import TemplateMarketPage from './pages/template/TemplateMarketPage'
 import UserManagementPage from './pages/admin/UserManagementPage'
 import RoleManagementPage from './pages/admin/RoleManagementPage'
+import AiSettingsPage from './pages/admin/ai-settings/AiSettingsPage'
+import AiAssistant from './components/common/AiAssistant'
 
 function App() {
   return (
@@ -59,9 +61,11 @@ function App() {
             <Route path="admin" element={<Navigate to="/admin/users" replace />} />
             <Route path="admin/users" element={<UserManagementPage />} />
             <Route path="admin/roles" element={<RoleManagementPage />} />
+            <Route path="admin/ai-settings" element={<AiSettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
+        <AiAssistant />
       </BrowserRouter>
     </AntApp>
   )

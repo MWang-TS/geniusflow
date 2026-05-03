@@ -179,7 +179,6 @@ export class KnowledgeBasesService {
         }),
         signal: controller.signal,
       })
-      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error(`AI service returned ${response.status}`)
@@ -189,6 +188,8 @@ export class KnowledgeBasesService {
       return result
     } catch {
       return { chunks: [] }
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
@@ -199,7 +200,35 @@ export class KnowledgeBasesService {
         data: { parseStatus: 'processing' },
       })
 
-      const content = fs.readFileSync(filePath, 'utf-8')
+      let content: string
+
+      const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+      if (['pdf', 'docx', 'doc'].includes(ext)) {
+        // Delegate parsing to AI service which handles binary formats
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000)
+        try {
+          const parseResp = await fetch(`${this.aiServiceUrl}/ai/parse-path`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath, fileName }),
+            signal: controller.signal,
+          })
+          clearTimeout(timeoutId)
+          if (!parseResp.ok) {
+            const errBody = await parseResp.text()
+            throw new Error(`AI parse service returned ${parseResp.status}: ${errBody}`)
+          }
+          const parsed = await parseResp.json() as { text: string }
+          content = parsed.text
+        } catch (e) {
+          clearTimeout(timeoutId)
+          throw e
+        }
+      } else {
+        // TXT and unknown formats: read directly
+        content = fs.readFileSync(filePath, { encoding: 'utf-8' })
+      }
 
       await this.prisma.knowledgeBaseDocument.update({
         where: { id: docId },
@@ -228,33 +257,36 @@ export class KnowledgeBasesService {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000)
 
-      const response = await fetch(`${this.aiServiceUrl}/ai/embed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts: chunks }),
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
+      try {
+        const response = await fetch(`${this.aiServiceUrl}/ai/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texts: chunks }),
+          signal: controller.signal,
+        })
 
-      if (!response.ok) throw new Error('Embedding failed')
+        if (!response.ok) throw new Error('Embedding failed')
 
-      const { embeddings } = await response.json() as { embeddings: number[][] }
+        const { embeddings } = await response.json() as { embeddings: number[][] }
 
-      for (let i = 0; i < chunks.length; i++) {
-        await this.prisma.$executeRawUnsafe(
-          `INSERT INTO document_chunks (id, document_id, chunk_index, content, embedding, created_at) VALUES ($1, $2, $3, $4, $5::vector, NOW())`,
-          crypto.randomUUID(),
-          docId,
-          i,
-          chunks[i],
-          `[${embeddings[i].join(',')}]`,
-        )
+        for (let i = 0; i < chunks.length; i++) {
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO document_chunks (id, document_id, chunk_index, content, embedding, created_at) VALUES ($1, $2, $3, $4, $5::vector, NOW())`,
+            crypto.randomUUID(),
+            docId,
+            i,
+            chunks[i],
+            `[${embeddings[i].join(',')}]`,
+          )
+        }
+
+        await this.prisma.knowledgeBaseDocument.update({
+          where: { id: docId },
+          data: { vectorizedStatus: 'completed', chunkCount: chunks.length },
+        })
+      } finally {
+        clearTimeout(timeoutId)
       }
-
-      await this.prisma.knowledgeBaseDocument.update({
-        where: { id: docId },
-        data: { vectorizedStatus: 'completed', chunkCount: chunks.length },
-      })
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e)
       await this.prisma.knowledgeBaseDocument.update({

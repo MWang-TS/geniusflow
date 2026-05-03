@@ -40,4 +40,18 @@ export class RolesController {
   remove(@Param('id') id: string, @Req() req: any) {
     return this.service.remove(id, req.user.userId)
   }
+
+  @Get(':id/routes')
+  getRoutePermissions(@Param('id') id: string) {
+    return this.service.getRoutePermissions(id)
+  }
+
+  @Put(':id/routes')
+  updateRoutePermissions(
+    @Param('id') id: string,
+    @Body() dto: { routes: string[] },
+    @Req() req: any,
+  ) {
+    return this.service.updateRoutePermissions(id, dto.routes || [], req.user.userId)
+  }
 }

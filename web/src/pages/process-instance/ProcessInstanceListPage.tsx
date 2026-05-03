@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Table, Button, Space, Tag, Select, App, Popconfirm, Tooltip } from 'antd'
-import { ReloadOutlined, StopOutlined, EyeOutlined } from '@ant-design/icons'
+import { ReloadOutlined, StopOutlined, EyeOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { processInstanceApi, type ProcessInstanceListItem } from '../../api/process-instance'
 
@@ -118,6 +118,9 @@ const ProcessInstanceListPage: React.FC = () => {
       title="流程实例"
       extra={
         <Space>
+          <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => navigate('/instances/new')}>
+            发起流程
+          </Button>
           <Select placeholder="状态筛选" allowClear style={{ width: 120 }} value={status}
             onChange={(v) => { setStatus(v); setTimeout(() => fetchData(1, pagination.pageSize), 0) }}
             options={[

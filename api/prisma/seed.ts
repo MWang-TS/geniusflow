@@ -35,22 +35,14 @@ async function main() {
   // 分配管理员角色
   const adminRole = await prisma.role.findUnique({ where: { name: 'admin' } });
   if (adminRole) {
-    await prisma.userRole.upsert({
-      where: {
-        userId_roleId_scopeType_scopeId: {
-          userId: admin.id,
-          roleId: adminRole.id,
-          scopeType: 'global',
-          scopeId: null,
-        },
-      },
-      update: {},
-      create: {
-        userId: admin.id,
-        roleId: adminRole.id,
-        scopeType: 'global',
-      },
+    const existing = await prisma.userRole.findFirst({
+      where: { userId: admin.id, roleId: adminRole.id, scopeType: 'global', scopeId: null },
     });
+    if (!existing) {
+      await prisma.userRole.create({
+        data: { userId: admin.id, roleId: adminRole.id, scopeType: 'global' },
+      });
+    }
   }
 
   console.log('Seed completed')
@@ -62,11 +54,11 @@ async function main() {
       description: '适用于IT咨询项目的标准交付流程，包含需求调研、方案设计、交付验收三个阶段',
       category: '咨询',
       nodes: [
-        { id: 'tpl-start', type: 'start', nodeName: '开始', sortOrder: 0 },
-        { id: 'tpl-1', type: 'task', nodeName: '需求调研', sortOrder: 1 },
-        { id: 'tpl-2', type: 'task', nodeName: '方案设计', sortOrder: 2 },
-        { id: 'tpl-3', type: 'task', nodeName: '交付验收', sortOrder: 3 },
-        { id: 'tpl-end', type: 'end', nodeName: '结束', sortOrder: 4 },
+        { id: 'tpl-start', type: 'start', nodeName: '开始', sortOrder: 0, position: { x: 250, y: 50 }, data: { label: '开始' } },
+        { id: 'tpl-1', type: 'task', nodeName: '需求调研', sortOrder: 1, position: { x: 250, y: 170 }, data: { label: '需求调研' } },
+        { id: 'tpl-2', type: 'task', nodeName: '方案设计', sortOrder: 2, position: { x: 250, y: 290 }, data: { label: '方案设计' } },
+        { id: 'tpl-3', type: 'task', nodeName: '交付验收', sortOrder: 3, position: { x: 250, y: 410 }, data: { label: '交付验收' } },
+        { id: 'tpl-end', type: 'end', nodeName: '结束', sortOrder: 4, position: { x: 250, y: 530 }, data: { label: '结束' } },
       ],
       edges: [
         { id: 'tpl-e1', source: 'tpl-start', target: 'tpl-1' },
@@ -80,13 +72,13 @@ async function main() {
       description: '标准软件开发流程，涵盖需求分析、开发、测试、上线各环节',
       category: '研发',
       nodes: [
-        { id: 'tpl2-start', type: 'start', nodeName: '开始', sortOrder: 0 },
-        { id: 'tpl2-1', type: 'task', nodeName: '需求分析', sortOrder: 1 },
-        { id: 'tpl2-2', type: 'task', nodeName: '技术设计', sortOrder: 2 },
-        { id: 'tpl2-3', type: 'task', nodeName: '编码开发', sortOrder: 3 },
-        { id: 'tpl2-4', type: 'task', nodeName: '测试验证', sortOrder: 4 },
-        { id: 'tpl2-5', type: 'task', nodeName: '上线部署', sortOrder: 5 },
-        { id: 'tpl2-end', type: 'end', nodeName: '结束', sortOrder: 6 },
+        { id: 'tpl2-start', type: 'start', nodeName: '开始', sortOrder: 0, position: { x: 250, y: 50 }, data: { label: '开始' } },
+        { id: 'tpl2-1', type: 'task', nodeName: '需求分析', sortOrder: 1, position: { x: 250, y: 170 }, data: { label: '需求分析' } },
+        { id: 'tpl2-2', type: 'task', nodeName: '技术设计', sortOrder: 2, position: { x: 250, y: 290 }, data: { label: '技术设计' } },
+        { id: 'tpl2-3', type: 'task', nodeName: '编码开发', sortOrder: 3, position: { x: 250, y: 410 }, data: { label: '编码开发' } },
+        { id: 'tpl2-4', type: 'task', nodeName: '测试验证', sortOrder: 4, position: { x: 250, y: 530 }, data: { label: '测试验证' } },
+        { id: 'tpl2-5', type: 'task', nodeName: '上线部署', sortOrder: 5, position: { x: 250, y: 650 }, data: { label: '上线部署' } },
+        { id: 'tpl2-end', type: 'end', nodeName: '结束', sortOrder: 6, position: { x: 250, y: 770 }, data: { label: '结束' } },
       ],
       edges: [
         { id: 'tpl2-e1', source: 'tpl2-start', target: 'tpl2-1' },
@@ -102,12 +94,12 @@ async function main() {
       description: '企业合同审批流程，包含起草、法务审核、财务审核、最终签批',
       category: '行政',
       nodes: [
-        { id: 'tpl3-start', type: 'start', nodeName: '开始', sortOrder: 0 },
-        { id: 'tpl3-1', type: 'task', nodeName: '合同起草', sortOrder: 1 },
-        { id: 'tpl3-2', type: 'task', nodeName: '法务审核', sortOrder: 2 },
-        { id: 'tpl3-3', type: 'task', nodeName: '财务审核', sortOrder: 3 },
-        { id: 'tpl3-4', type: 'task', nodeName: '领导签批', sortOrder: 4 },
-        { id: 'tpl3-end', type: 'end', nodeName: '结束', sortOrder: 5 },
+        { id: 'tpl3-start', type: 'start', nodeName: '开始', sortOrder: 0, position: { x: 250, y: 50 }, data: { label: '开始' } },
+        { id: 'tpl3-1', type: 'task', nodeName: '合同起草', sortOrder: 1, position: { x: 250, y: 170 }, data: { label: '合同起草' } },
+        { id: 'tpl3-2', type: 'task', nodeName: '法务审核', sortOrder: 2, position: { x: 250, y: 290 }, data: { label: '法务审核' } },
+        { id: 'tpl3-3', type: 'task', nodeName: '财务审核', sortOrder: 3, position: { x: 250, y: 410 }, data: { label: '财务审核' } },
+        { id: 'tpl3-4', type: 'task', nodeName: '领导签批', sortOrder: 4, position: { x: 250, y: 530 }, data: { label: '领导签批' } },
+        { id: 'tpl3-end', type: 'end', nodeName: '结束', sortOrder: 5, position: { x: 250, y: 650 }, data: { label: '结束' } },
       ],
       edges: [
         { id: 'tpl3-e1', source: 'tpl3-start', target: 'tpl3-1' },

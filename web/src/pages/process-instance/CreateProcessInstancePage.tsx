@@ -102,56 +102,56 @@ const CreateProcessInstancePage: React.FC = () => {
             rules={[{ required: true, message: '请选择' }]}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-        </Form>
 
-        {selectedDef && (
-          <>
-            <Descriptions title="流程概览" size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="流程名称">{selectedDef.name}</Descriptions.Item>
-              <Descriptions.Item label="版本">v{selectedDef.version}</Descriptions.Item>
-              <Descriptions.Item label="总节点数">{selectedDef.nodes.length}</Descriptions.Item>
-              <Descriptions.Item label="任务节点数">
-                {selectedDef.nodes.filter((n) => n.nodeType === 'task').length}
-              </Descriptions.Item>
-            </Descriptions>
+          {selectedDef && (
+            <>
+              <Descriptions title="流程概览" size="small" column={2} style={{ marginBottom: 16 }}>
+                <Descriptions.Item label="流程名称">{selectedDef.name}</Descriptions.Item>
+                <Descriptions.Item label="版本">v{selectedDef.version}</Descriptions.Item>
+                <Descriptions.Item label="总节点数">{selectedDef.nodes.length}</Descriptions.Item>
+                <Descriptions.Item label="任务节点数">
+                  {selectedDef.nodes.filter((n) => n.nodeType === 'task').length}
+                </Descriptions.Item>
+              </Descriptions>
 
-            <Card title="分配执行人" size="small" style={{ marginTop: 16 }}>
-              <List
-                dataSource={selectedDef.nodes.filter((n) => n.nodeType === 'task')}
-                renderItem={(node) => (
-                  <List.Item>
-                    <div style={{ width: '100%' }}>
-                      <div style={{ marginBottom: 4 }}>
-                        <Tag color={node.nodeType === 'start' ? 'blue' : node.nodeType === 'end' ? 'red' : 'default'}>
-                          {node.nodeType === 'start' ? '开始' : node.nodeType === 'end' ? '结束' : '任务'}
-                        </Tag>
-                        <span>{node.nodeName}</span>
-                        {node.progressConfig?.plannedDuration && (
-                          <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>
-                            工期 {node.progressConfig.plannedDuration} 天
-                          </span>
-                        )}
+              <Card title="分配执行人" size="small" style={{ marginTop: 16 }}>
+                <List
+                  dataSource={selectedDef.nodes.filter((n) => n.nodeType === 'task')}
+                  renderItem={(node) => (
+                    <List.Item>
+                      <div style={{ width: '100%' }}>
+                        <div style={{ marginBottom: 4 }}>
+                          <Tag color={node.nodeType === 'start' ? 'blue' : node.nodeType === 'end' ? 'red' : 'default'}>
+                            {node.nodeType === 'start' ? '开始' : node.nodeType === 'end' ? '结束' : '任务'}
+                          </Tag>
+                          <span>{node.nodeName}</span>
+                          {node.progressConfig?.plannedDuration && (
+                            <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>
+                              工期 {node.progressConfig.plannedDuration} 天
+                            </span>
+                          )}
+                        </div>
+                        <Form.Item name={['assignees', node.id]} noStyle>
+                          <Select placeholder="选择执行人" showSearch allowClear style={{ width: '100%' }}
+                            filterOption={(input, option) => (option?.label as string || '').includes(input)}
+                            options={users.map((u) => ({ label: u.name, value: u.id }))} />
+                        </Form.Item>
                       </div>
-                      <Form.Item name={['assignees', node.id]} noStyle>
-                        <Select placeholder="选择执行人" showSearch allowClear style={{ width: '100%' }}
-                          filterOption={(input, option) => (option?.label as string || '').includes(input)}
-                          options={users.map((u) => ({ label: u.name, value: u.id }))} />
-                      </Form.Item>
-                    </div>
-                  </List.Item>
-                )}
-              />
-            </Card>
-          </>
-        )}
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            </>
+          )}
 
-        <div style={{ marginTop: 24, textAlign: 'center' }}>
-          <Button type="primary" size="large" icon={<PlayCircleOutlined />}
-            loading={creating} disabled={!selectedDef}
-            onClick={handleCreate}>
-            创建实例
-          </Button>
-        </div>
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
+            <Button type="primary" size="large" icon={<PlayCircleOutlined />}
+              loading={creating} disabled={!selectedDef}
+              onClick={handleCreate}>
+              创建实例
+            </Button>
+          </div>
+        </Form>
       </Card>
     </div>
   )

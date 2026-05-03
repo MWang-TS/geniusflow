@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authApi, type LoginRequest } from '@/api/auth'
+import { rolesApi } from '@/api/roles'
 
 export interface User {
   id: string
@@ -14,17 +15,21 @@ interface AuthState {
   accessToken: string | null
   refreshToken: string | null
   isAuthenticated: boolean
+  /** null = admin，全部可见；string[] = 允许访问的路由前缀列表 */
+  allowedRoutes: string[] | null
   login: (credentials: LoginRequest) => Promise<void>
   logout: () => void
+  loadRoutePermissions: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      allowedRoutes: null,
 
       login: async (credentials) => {
         const res = await authApi.login(credentials)
@@ -38,6 +43,8 @@ export const useAuthStore = create<AuthState>()(
             refreshToken: res.data.refreshToken,
             isAuthenticated: true,
           })
+          // 登录后立即加载路由权限
+          await get().loadRoutePermissions()
         }
       },
 
@@ -47,7 +54,18 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
+          allowedRoutes: null,
         })
+      },
+
+      loadRoutePermissions: async () => {
+        try {
+          const res = await rolesApi.getMyRoutes()
+          const data = (res as any)?.data ?? res
+          set({ allowedRoutes: data.routes ?? null })
+        } catch {
+          // 加载失败时不影响已有状态
+        }
       },
     }),
     {
@@ -57,6 +75,7 @@ export const useAuthStore = create<AuthState>()(
         refreshToken: state.refreshToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        allowedRoutes: state.allowedRoutes,
       }),
     },
   ),

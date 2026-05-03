@@ -19,6 +19,9 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { QueueModule } from './queue/queue.module';
 import { WsModule } from './ws/ws.module';
 
+import { AiSettingsModule } from './ai-settings/ai-settings.module'
+import { AiAssistantModule } from './ai-assistant/ai-assistant.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -42,6 +45,8 @@ import { WsModule } from './ws/ws.module';
     AuditLogModule,
     AiReportsModule,
     SchedulerModule,
+    AiSettingsModule,
+    AiAssistantModule,
   ],
 })
 export class AppModule {}

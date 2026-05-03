@@ -14,11 +14,13 @@ export class TemplatesController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('category') category?: string,
+    @Query('keyword') keyword?: string,
   ) {
     return this.service.findAll({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
       category,
+      keyword,
     })
   }
 

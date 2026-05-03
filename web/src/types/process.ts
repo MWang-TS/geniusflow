@@ -93,6 +93,14 @@ export interface AiConfig {
     enabled?: boolean
     promptTemplate?: string
   }
+  inputAgent?: {
+    enabled?: boolean
+    promptTemplate?: string
+  }
+  outputAgent?: {
+    enabled?: boolean
+    promptTemplate?: string
+  }
 }
 
 export interface ProgressConfig {

@@ -11,7 +11,7 @@ export interface TemplateItem {
 }
 
 export const templateApi = {
-  list: (params?: { page?: number; pageSize?: number; category?: string }) =>
+  list: (params?: { page?: number; pageSize?: number; category?: string; keyword?: string }) =>
     client.get('/templates', { params }),
 
   clone: (id: string) =>

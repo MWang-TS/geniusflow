@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   Card, Table, Button, Tag, Space, App, Input, Modal, Form, Popconfirm,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, ApartmentOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { rolesApi, type RoleItem, type RoleDetail } from '../../api/roles'
+import RoleRoutesDrawer from './RoleRoutesDrawer'
 
 const RoleManagementPage: React.FC = () => {
   const { message } = App.useApp()
@@ -16,6 +17,7 @@ const RoleManagementPage: React.FC = () => {
   const [editingRole, setEditingRole] = useState<RoleItem | null>(null)
   const [roleDetail, setRoleDetail] = useState<RoleDetail | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [routesDrawerRole, setRoutesDrawerRole] = useState<RoleItem | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -92,10 +94,11 @@ const RoleManagementPage: React.FC = () => {
       render: (v: string) => new Date(v).toLocaleString('zh-CN'),
     },
     {
-      title: '操作', key: 'actions', width: 200,
+      title: '操作', key: 'actions', width: 240,
       render: (_, record) => (
         <Space>
           <Button size="small" onClick={() => handleViewUsers(record.id)}>用户</Button>
+          <Button size="small" icon={<ApartmentOutlined />} onClick={() => setRoutesDrawerRole(record)}>路由</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>编辑</Button>
           <Popconfirm title="确定删除该角色？" onConfirm={() => handleDelete(record.id)}>
             <Button size="small" danger icon={<DeleteOutlined />} />
@@ -150,6 +153,15 @@ const RoleManagementPage: React.FC = () => {
           <div style={{ color: '#999', textAlign: 'center', padding: 24 }}>暂无用户</div>
         )}
       </Modal>
+
+      {routesDrawerRole && (
+        <RoleRoutesDrawer
+          roleId={routesDrawerRole.id}
+          roleName={routesDrawerRole.name}
+          open={!!routesDrawerRole}
+          onClose={() => setRoutesDrawerRole(null)}
+        />
+      )}
     </>
   )
 }

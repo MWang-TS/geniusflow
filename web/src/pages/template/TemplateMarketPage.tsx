@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, Table, Button, Tag, Space, App, Input } from 'antd'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -6,16 +7,18 @@ import { templateApi, type TemplateItem } from '../../api/template'
 
 const TemplateMarketPage: React.FC = () => {
   const { message } = App.useApp()
+  const navigate = useNavigate()
   const [data, setData] = useState<TemplateItem[]>([])
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 })
   const [cloning, setCloning] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchData = useCallback(async (page = 1, pageSize = 20) => {
+  const fetchData = useCallback(async (page = 1, pageSize = 20, kw = keyword) => {
     setLoading(true)
     try {
-      const res = await templateApi.list({ page, pageSize })
+      const res = await templateApi.list({ page, pageSize, keyword: kw || undefined })
       setData(res.data.list || [])
       setPagination(res.data.pagination)
     } catch {
@@ -23,28 +26,27 @@ const TemplateMarketPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [message])
+  }, [keyword, message])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData(1, pagination.pageSize, keyword) }, [])
 
   const handleSearch = (value: string) => {
-    const filtered = data.filter((t) =>
-      t.name.toLowerCase().includes(value.toLowerCase()) ||
-      (t.description && t.description.toLowerCase().includes(value.toLowerCase()))
-    )
-    if (!value) {
-      fetchData()
-    } else {
-      setData(filtered)
-    }
     setKeyword(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      fetchData(1, pagination.pageSize, value)
+    }, 350)
   }
 
   const handleClone = async (id: string) => {
     setCloning(id)
     try {
-      await templateApi.clone(id)
-      message.success('模板复制成功，请在流程管理中查看')
+      const res = await templateApi.clone(id)
+      const clonedId = res.data?.id
+      message.success('复制成功，即将打开编辑器…')
+      if (clonedId) {
+        setTimeout(() => navigate(`/processes/${clonedId}/edit`), 800)
+      }
     } catch {
       message.error('复制失败')
     } finally {
@@ -88,12 +90,19 @@ const TemplateMarketPage: React.FC = () => {
   return (
     <Card title="模板市场" extra={
       <Space>
-        <Input.Search placeholder="搜索模板" style={{ width: 200 }} value={keyword} onChange={(e) => handleSearch(e.target.value)} />
-        <Button icon={<ReloadOutlined />} onClick={() => fetchData(1, pagination.pageSize)} />
+        <Input.Search
+          placeholder="搜索模板名称或描述"
+          style={{ width: 220 }}
+          value={keyword}
+          onChange={(e) => handleSearch(e.target.value)}
+          onSearch={(v) => fetchData(1, pagination.pageSize, v)}
+          allowClear
+        />
+        <Button icon={<ReloadOutlined />} onClick={() => fetchData(1, pagination.pageSize, keyword)} />
       </Space>
     }>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading}
-        pagination={{ ...pagination, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`, onChange: (p, ps) => fetchData(p, ps) }} />
+        pagination={{ ...pagination, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`, onChange: (p, ps) => fetchData(p, ps, keyword) }} />
     </Card>
   )
 }
