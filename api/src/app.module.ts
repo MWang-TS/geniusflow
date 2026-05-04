@@ -21,6 +21,8 @@ import { WsModule } from './ws/ws.module';
 
 import { AiSettingsModule } from './ai-settings/ai-settings.module'
 import { AiAssistantModule } from './ai-assistant/ai-assistant.module'
+import { SkillChatModule } from './skill-chat/skill-chat.module'
+import { OpenApiModule } from './open-api/open-api.module'
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { AiAssistantModule } from './ai-assistant/ai-assistant.module'
     SchedulerModule,
     AiSettingsModule,
     AiAssistantModule,
+    SkillChatModule,
+    OpenApiModule,
   ],
 })
 export class AppModule {}

@@ -10,6 +10,8 @@ export const ALL_ROUTES: RouteConfig[] = [
   { path: '/instances', label: '流程实例', group: '流程' },
   { path: '/my-tasks', label: '我的任务', group: '任务' },
   { path: '/approvals', label: '审批中心', group: '任务' },
+  { path: '/skill-assistant', label: '技能对话', group: 'AI 工作台' },
+  { path: '/api-platform', label: 'API 密钥管理', group: 'AI 工作台' },
   { path: '/progress', label: '进度监控', group: '监控' },
   { path: '/knowledge-bases', label: '知识库', group: '资源' },
   { path: '/notifications', label: '通知中心', group: '资源' },

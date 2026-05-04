@@ -301,9 +301,9 @@ export default function TaskAiAssistant({ open, onClose, nodeContext }: TaskAiAs
                   padding: '10px 14px',
                 }}>
                   {msg.content ? (
-                    <ReactMarkdown className="task-ai-md" remarkPlugins={[remarkGfm]}>
+                    <div className="task-ai-md"><ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {msg.content}
-                    </ReactMarkdown>
+                    </ReactMarkdown></div>
                   ) : (
                     <Spin indicator={<span style={{ fontSize: 12 }}>思考中...</span>} size="small" />
                   )}

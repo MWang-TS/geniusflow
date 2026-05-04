@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, theme, Dropdown, Avatar, Space, Typography } from 'antd'
+import { Layout, Menu, theme, Dropdown, Avatar, Space, Typography, Tag } from 'antd'
 import {
   NodeIndexOutlined,
   FileTextOutlined,
@@ -13,8 +13,13 @@ import {
   UserOutlined,
   LogoutOutlined,
   ProjectOutlined,
+  RobotOutlined,
+  ApiOutlined,
+  MessageOutlined,
+  KeyOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth.store'
+import { usePlatformModeStore, PLATFORM_MODES } from '@/stores/platform-mode.store'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
@@ -23,6 +28,7 @@ const MainLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout, allowedRoutes } = useAuthStore()
+  const { mode } = usePlatformModeStore()
   const [collapsed, setCollapsed] = useState(false)
   const [openKeys, setOpenKeys] = useState<string[]>([]) 
   const {
@@ -34,47 +40,15 @@ const MainLayout = () => {
     return allowedRoutes.some((r) => path === r || path.startsWith(r + '/'))
   }
 
-  const allMenuItems = [
-    {
-      key: '/processes',
-      icon: <NodeIndexOutlined />,
-      label: '流程管理',
-    },
-    {
-      key: '/instances',
-      icon: <ProjectOutlined />,
-      label: '流程实例',
-    },
-    {
-      key: '/my-tasks',
-      icon: <CheckSquareOutlined />,
-      label: '我的任务',
-    },
-    {
-      key: '/approvals',
-      icon: <FileTextOutlined />,
-      label: '审批中心',
-    },
-    {
-      key: '/progress',
-      icon: <BarChartOutlined />,
-      label: '进度监控',
-    },
-    {
-      key: '/knowledge-bases',
-      icon: <BookOutlined />,
-      label: '知识库',
-    },
-    {
-      key: '/notifications',
-      icon: <BellOutlined />,
-      label: '通知中心',
-    },
-    {
-      key: '/templates',
-      icon: <AppstoreOutlined />,
-      label: '模板市场',
-    },
+  const workflowMenuItems = [
+    { key: '/processes', icon: <NodeIndexOutlined />, label: '流程管理' },
+    { key: '/instances', icon: <ProjectOutlined />, label: '流程实例' },
+    { key: '/my-tasks', icon: <CheckSquareOutlined />, label: '我的任务' },
+    { key: '/approvals', icon: <FileTextOutlined />, label: '审批中心' },
+    { key: '/progress', icon: <BarChartOutlined />, label: '进度监控' },
+    { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库' },
+    { key: '/notifications', icon: <BellOutlined />, label: '通知中心' },
+    { key: '/templates', icon: <AppstoreOutlined />, label: '模板市场' },
     {
       key: '/admin',
       icon: <SettingOutlined />,
@@ -87,11 +61,30 @@ const MainLayout = () => {
     },
   ]
 
+  const assistantMenuItems = [
+    { key: '/skill-assistant', icon: <MessageOutlined />, label: '技能对话' },
+    { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库管理' },
+    { key: '/admin/ai-settings', icon: <RobotOutlined />, label: 'AI 角色配置' },
+  ]
+
+  const apiPlatformMenuItems = [
+    { key: '/api-platform', icon: <KeyOutlined />, label: 'API 密钥管理' },
+    { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库管理' },
+    { key: '/admin/ai-settings', icon: <ApiOutlined />, label: 'AI 角色配置' },
+  ]
+
+  const allMenuItems =
+    mode === 'workflow'
+      ? workflowMenuItems
+      : mode === 'assistant'
+        ? assistantMenuItems
+        : apiPlatformMenuItems
+
   const menuItems = useMemo(() => {
     return allMenuItems
-      .map((item) => {
+      .map((item: any) => {
         if (item.children) {
-          const visibleChildren = item.children.filter((c) => isRouteVisible(c.key))
+          const visibleChildren = item.children.filter((c: any) => isRouteVisible(c.key))
           if (visibleChildren.length === 0) return null
           return { ...item, children: visibleChildren }
         }
@@ -99,7 +92,7 @@ const MainLayout = () => {
       })
       .filter(Boolean) as typeof allMenuItems
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowedRoutes])
+  }, [allowedRoutes, mode])
 
   const getSelectedKey = () => {
     const path = location.pathname
@@ -111,6 +104,8 @@ const MainLayout = () => {
     if (path.startsWith('/notifications')) return '/notifications'
     if (path.startsWith('/progress')) return '/progress'
     if (path.startsWith('/templates')) return '/templates'
+    if (path.startsWith('/skill-assistant')) return '/skill-assistant'
+    if (path.startsWith('/api-platform')) return '/api-platform'
     if (path.startsWith('/admin/users')) return '/admin/users'
     if (path.startsWith('/admin/roles')) return '/admin/roles'
     if (path.startsWith('/admin/ai-settings')) return '/admin/ai-settings'
@@ -129,6 +124,8 @@ const MainLayout = () => {
       },
     },
   ]
+
+  const currentModeInfo = PLATFORM_MODES.find((m) => m.key === mode)
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -164,8 +161,14 @@ const MainLayout = () => {
           background: colorBgContainer,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
+          justifyContent: 'space-between',
         }}>
+          <Tag
+            color={mode === 'workflow' ? 'blue' : mode === 'assistant' ? 'green' : 'purple'}
+            style={{ margin: 0, fontSize: 13 }}
+          >
+            {currentModeInfo?.label}
+          </Tag>
           <Dropdown menu={{ items: userMenuItems }}>
             <Space style={{ cursor: 'pointer' }}>
               <Avatar size="small" icon={<UserOutlined />} />

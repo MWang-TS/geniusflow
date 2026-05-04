@@ -117,4 +117,8 @@ export const aiSettingsApi = {
   // Provider Test
   testProvider: (id: string) =>
     client.post<{ ok: boolean; latencyMs?: number; error?: string }>(`/ai-settings/providers/${id}/test`),
+
+  // Export / Import
+  exportConfig: () => client.get<any>('/ai-settings/export'),
+  importConfig: (data: any) => client.post<{ success: boolean; summary: Record<string, number> }>('/ai-settings/import', data),
 }

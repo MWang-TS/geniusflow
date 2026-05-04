@@ -8,7 +8,9 @@ import {
   Param,
   Query,
   UseGuards,
+  Res,
 } from '@nestjs/common'
+import { Response } from 'express'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/roles.guard'
 import { Roles } from '../auth/roles.decorator'
@@ -164,5 +166,21 @@ export class AiSettingsController {
   @Delete('fallbacks/:id')
   deleteFallback(@Param('id') id: string) {
     return this.service.deleteFallback(id)
+  }
+
+  // ──── Export / Import ─────────────────────────────────────────────────────
+
+  @Get('export')
+  async exportConfig(@Res() res: Response) {
+    const data = await this.service.exportConfig()
+    const filename = `geniusflow-ai-settings-${new Date().toISOString().slice(0, 10)}.json`
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(JSON.stringify(data, null, 2))
+  }
+
+  @Post('import')
+  importConfig(@Body() data: any) {
+    return this.service.importConfig(data)
   }
 }

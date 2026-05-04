@@ -20,6 +20,8 @@ import TemplateMarketPage from './pages/template/TemplateMarketPage'
 import UserManagementPage from './pages/admin/UserManagementPage'
 import RoleManagementPage from './pages/admin/RoleManagementPage'
 import AiSettingsPage from './pages/admin/ai-settings/AiSettingsPage'
+import SkillAssistantPage from './pages/skill-assistant/SkillAssistantPage'
+import ApiPlatformPage from './pages/api-platform/ApiPlatformPage'
 import AiAssistant from './components/common/AiAssistant'
 
 function App() {
@@ -45,6 +47,7 @@ function App() {
             }
           >
             <Route index element={<Navigate to="/processes" replace />} />
+            {/* ── Mode 1: Workflow ── */}
             <Route path="processes" element={<ProcessListPage />} />
             <Route path="instances" element={<ProcessInstanceListPage />} />
             <Route path="instances/new" element={<CreateProcessInstancePage />} />
@@ -53,11 +56,24 @@ function App() {
             <Route path="my-tasks/:nodeInstanceId/execute" element={<NodeExecutionPage />} />
             <Route path="approvals" element={<ApprovalListPage />} />
             <Route path="approvals/:taskId" element={<ApprovalDetailPage />} />
-            <Route path="knowledge-bases" element={<KnowledgeBaseListPage />} />
             <Route path="progress" element={<ProgressListPage />} />
             <Route path="progress/:id" element={<ProgressDetailPage />} />
             <Route path="notifications" element={<NotificationListPage />} />
             <Route path="templates" element={<TemplateMarketPage />} />
+            {/* ── Shared (Knowledge Base) ── */}
+            <Route path="knowledge-bases" element={<KnowledgeBaseListPage />} />
+            {/* ── Mode 2: Skill Assistant ── */}
+            <Route path="skill-assistant" element={<SkillAssistantPage />} />
+            {/* ── Mode 3: API Platform ── */}
+            <Route
+              path="api-platform"
+              element={
+                <RouteGuard roles={['admin', 'designer']}>
+                  <ApiPlatformPage />
+                </RouteGuard>
+              }
+            />
+            {/* ── Admin ── */}
             <Route path="admin" element={<Navigate to="/admin/users" replace />} />
             <Route path="admin/users" element={<UserManagementPage />} />
             <Route path="admin/roles" element={<RoleManagementPage />} />

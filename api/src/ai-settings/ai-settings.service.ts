@@ -449,6 +449,235 @@ export class AiSettingsService {
     return this.listFallbacks(dto.modelType)
   }
 
+  // ──── Export / Import ──────────────────────────────────────────────────────
+
+  /** Export all AI settings as a portable JSON snapshot (API keys included). */
+  async exportConfig() {
+    const [providers, models, skills, roles, fallbacks] = await Promise.all([
+      this.prisma.aiProvider.findMany({ orderBy: { createdAt: 'asc' } }),
+      this.prisma.aiModel.findMany({ orderBy: { createdAt: 'asc' } }),
+      this.prisma.agentSkill.findMany({ orderBy: { createdAt: 'asc' } }),
+      this.prisma.agentRole.findMany({
+        orderBy: { createdAt: 'asc' },
+        include: { skills: { include: { skill: true } } },
+      }),
+      this.prisma.modelFallbackChain.findMany({
+        orderBy: [{ modelType: 'asc' }, { sortOrder: 'asc' }],
+        include: { model: true },
+      }),
+    ])
+
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      providers: providers.map((p) => ({
+        name: p.name,
+        type: p.type,
+        baseUrl: p.baseUrl,
+        apiKey: p.apiKey,
+        isEnabled: p.isEnabled,
+        extra: p.extra,
+      })),
+      models: models.map((m) => {
+        const providerName = providers.find((p) => p.id === m.providerId)?.name ?? ''
+        return {
+          providerName,
+          modelId: m.modelId,
+          name: m.name,
+          type: m.type,
+          isDefault: m.isDefault,
+          isEnabled: m.isEnabled,
+          contextWindow: m.contextWindow,
+          maxTokens: m.maxTokens,
+        }
+      }),
+      skills: skills.map((s) => ({
+        name: s.name,
+        description: s.description,
+        type: s.type,
+        config: s.config,
+        isEnabled: s.isEnabled,
+      })),
+      agentRoles: (roles as any[]).map((r) => ({
+        name: r.name,
+        description: r.description,
+        systemPrompt: r.systemPrompt,
+        modelName: r.modelId ? models.find((m) => m.id === r.modelId)?.name ?? null : null,
+        temperature: r.temperature,
+        maxTokens: r.maxTokens,
+        isEnabled: r.isEnabled,
+        skillNames: r.skills.map((rs: any) => rs.skill.name),
+      })),
+      fallbacks: fallbacks.map((f: any) => ({
+        modelType: f.modelType,
+        modelName: f.model?.name ?? '',
+        sortOrder: f.sortOrder,
+        isEnabled: f.isEnabled,
+        note: f.note,
+      })),
+    }
+  }
+
+  /** Upsert AI settings from a JSON snapshot. Returns a summary of created/updated counts. */
+  async importConfig(data: ReturnType<typeof this.exportConfig> extends Promise<infer T> ? T : never) {
+    const summary = { providers: 0, models: 0, skills: 0, agentRoles: 0, fallbacks: 0 }
+    const importedModels = data.models ?? []
+    const defaultTypes = [...new Set(importedModels.filter((m) => m.isDefault).map((m) => m.type))]
+    const assignedDefaults = new Set<string>()
+
+    // 1. Providers (upsert by name)
+    const providerNameToId: Record<string, string> = {}
+    for (const p of data.providers ?? []) {
+      const upserted = await this.prisma.aiProvider.upsert({
+        where: { name: p.name },
+        create: {
+          name: p.name,
+          type: p.type,
+          baseUrl: p.baseUrl,
+          apiKey: p.apiKey,
+          isEnabled: p.isEnabled ?? true,
+          extra: (p.extra ?? {}) as any,
+        },
+        update: {
+          type: p.type,
+          baseUrl: p.baseUrl,
+          ...(p.apiKey && { apiKey: p.apiKey }),
+          extra: (p.extra ?? {}) as any,
+        },
+      })
+      providerNameToId[p.name] = upserted.id
+      summary.providers++
+    }
+
+    // 2. Models (find by providerId+modelId+type, else create)
+    const modelNameToId: Record<string, string> = {}
+    if (defaultTypes.length) {
+      await this.prisma.aiModel.updateMany({
+        where: { type: { in: defaultTypes }, isDefault: true },
+        data: { isDefault: false },
+      })
+    }
+
+    for (const m of importedModels) {
+      const providerId = providerNameToId[m.providerName]
+      if (!providerId) continue
+      const isDefault = !!m.isDefault && !assignedDefaults.has(m.type)
+      if (isDefault) assignedDefaults.add(m.type)
+      const existing = await this.prisma.aiModel.findFirst({
+        where: { providerId, modelId: m.modelId, type: m.type },
+      })
+      let record: any
+      if (existing) {
+        record = await this.prisma.aiModel.update({
+          where: { id: existing.id },
+          data: {
+            name: m.name,
+            isDefault,
+            contextWindow: m.contextWindow,
+            maxTokens: m.maxTokens,
+          },
+        })
+      } else {
+        record = await this.prisma.aiModel.create({
+          data: {
+            providerId,
+            modelId: m.modelId,
+            name: m.name,
+            type: m.type,
+            isDefault,
+            isEnabled: m.isEnabled ?? true,
+            contextWindow: m.contextWindow,
+            maxTokens: m.maxTokens,
+          },
+        })
+      }
+      modelNameToId[m.name] = record.id
+      summary.models++
+    }
+
+    // 3. Skills (upsert by name)
+    const skillNameToId: Record<string, string> = {}
+    for (const s of data.skills ?? []) {
+      const upserted = await this.prisma.agentSkill.upsert({
+        where: { name: s.name },
+        create: {
+          name: s.name,
+          description: s.description,
+          type: s.type,
+          config: (s.config ?? {}) as any,
+          isEnabled: s.isEnabled ?? true,
+        },
+        update: {
+          description: s.description,
+          type: s.type,
+          config: (s.config ?? {}) as any,
+        },
+      })
+      skillNameToId[s.name] = upserted.id
+      summary.skills++
+    }
+
+    // 4. Agent Roles (upsert by name)
+    for (const r of data.agentRoles ?? []) {
+      const modelId = r.modelName ? modelNameToId[r.modelName] ?? null : null
+      const upserted = await this.prisma.agentRole.upsert({
+        where: { name: r.name },
+        create: {
+          name: r.name,
+          description: r.description,
+          systemPrompt: r.systemPrompt,
+          modelId,
+          temperature: r.temperature ?? 0.7,
+          maxTokens: r.maxTokens,
+          isEnabled: r.isEnabled ?? true,
+        },
+        update: {
+          description: r.description,
+          systemPrompt: r.systemPrompt,
+          modelId,
+          temperature: r.temperature ?? 0.7,
+          maxTokens: r.maxTokens,
+        },
+      })
+      // Sync skills
+      if (r.skillNames?.length) {
+        await this.prisma.agentRoleSkill.deleteMany({ where: { agentRoleId: upserted.id } })
+        const validSkillIds = r.skillNames.map((n: string) => skillNameToId[n]).filter(Boolean)
+        if (validSkillIds.length) {
+          await this.prisma.agentRoleSkill.createMany({
+            data: validSkillIds.map((skillId: string) => ({ agentRoleId: upserted.id, skillId })),
+            skipDuplicates: true,
+          })
+        }
+      }
+      summary.agentRoles++
+    }
+
+    // 5. Fallback chains (delete existing, recreate)
+    if (data.fallbacks?.length) {
+      const modelTypes = [...new Set(data.fallbacks.map((f: any) => f.modelType))]
+      await this.prisma.modelFallbackChain.deleteMany({
+        where: { modelType: { in: modelTypes } },
+      })
+      for (const f of data.fallbacks) {
+        const modelId = modelNameToId[f.modelName]
+        if (!modelId) continue
+        await this.prisma.modelFallbackChain.create({
+          data: {
+            modelType: f.modelType,
+            modelId,
+            sortOrder: f.sortOrder,
+            isEnabled: f.isEnabled ?? true,
+            note: f.note,
+          },
+        })
+        summary.fallbacks++
+      }
+    }
+
+    return { success: true, summary }
+  }
+
   // ──── Sanitization helpers (strip sensitive fields from responses) ─────────
 
   private safeProvider(p: Record<string, unknown>): Record<string, unknown> {

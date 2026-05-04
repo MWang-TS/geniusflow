@@ -373,7 +373,7 @@ export default function AiAssistant() {
             <Button
               type="primary"
               icon={loading ? <LoadingOutlined /> : <SendOutlined />}
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={!input.trim() || loading}
               style={{ borderRadius: 8, flexShrink: 0, height: 36 }}
             />

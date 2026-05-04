@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -23,6 +24,7 @@ model User {
   processDefinitions ProcessDefinition[]
   auditLogs         AuditLog[]
   notifications     Notification[]
+  apiKeys           ApiKey[]
 
   @@map("users")
 }
@@ -386,4 +388,25 @@ model ModelFallbackChain {
 
   @@unique([modelType, sortOrder])
   @@map("model_fallback_chains")
+}
+
+/// API keys for the AI Middle Platform (mode 3) — allows external systems to call skill-chat via OpenAI-compatible API
+model ApiKey {
+  id               String    @id @default(uuid())
+  name             String
+  keyHash          String    @unique @map("key_hash")
+  keyPrefix        String    @map("key_prefix")        // displayed prefix e.g. "gf_sk_abc123"
+  userId           String    @map("user_id")
+  knowledgeBaseIds Json      @default("[]") @map("knowledge_base_ids")  // allowed KB scope
+  agentRoleId      String?   @map("agent_role_id")
+  usageCount       Int       @default(0) @map("usage_count")
+  lastUsedAt       DateTime? @map("last_used_at")
+  expiresAt        DateTime? @map("expires_at")
+  isEnabled        Boolean   @default(true) @map("is_enabled")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
 }
