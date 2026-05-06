@@ -81,6 +81,15 @@ export class KnowledgeBasesController {
     return this.service.retryVectorize(id, docId)
   }
 
+  @Delete(':id/documents/:docId')
+  @Roles('admin')
+  deleteDocument(
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+  ) {
+    return this.service.deleteDocument(id, docId)
+  }
+
   @Post(':id/search')
   search(@Param('id') id: string, @Body() dto: SearchDto) {
     return this.service.search(dto)

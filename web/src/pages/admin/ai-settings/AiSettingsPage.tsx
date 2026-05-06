@@ -2,13 +2,14 @@ import { useState, useRef } from 'react'
 import { Card, Tabs, Button, Space, Tooltip, message } from 'antd'
 import {
   ApiOutlined, MessageOutlined, DatabaseOutlined, ThunderboltOutlined, RobotOutlined,
-  BranchesOutlined, DownloadOutlined, UploadOutlined,
+  BranchesOutlined, DownloadOutlined, UploadOutlined, CloudOutlined,
 } from '@ant-design/icons'
 import ProvidersTab from './ProvidersTab'
 import ModelsTab from './ModelsTab'
 import SkillsTab from './SkillsTab'
 import AgentRolesTab from './AgentRolesTab'
 import FallbackTab from './FallbackTab'
+import MineruTab from './MineruTab'
 import { aiSettingsApi } from '@/api/ai-settings'
 
 const TABS = [
@@ -41,6 +42,11 @@ const TABS = [
     key: 'agent-roles',
     label: <span><RobotOutlined /> Agent 角色</span>,
     children: <AgentRolesTab />,
+  },
+  {
+    key: 'mineru',
+    label: <span><CloudOutlined /> MinerU 文档解析</span>,
+    children: <MineruTab />,
   },
 ]
 

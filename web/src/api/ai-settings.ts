@@ -121,4 +121,8 @@ export const aiSettingsApi = {
   // Export / Import
   exportConfig: () => client.get<any>('/ai-settings/export'),
   importConfig: (data: any) => client.post<{ success: boolean; summary: Record<string, number> }>('/ai-settings/import', data),
+
+  // MinerU System Config
+  getMineruConfig: () => client.get<{ hasKey: boolean; apiKey: string }>('/ai-settings/system-config/mineru'),
+  saveMineruConfig: (apiKey: string) => client.put('/ai-settings/system-config/mineru', { apiKey }),
 }

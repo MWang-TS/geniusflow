@@ -3,11 +3,20 @@ import client from './client'
 export interface KnowledgeBaseItem {
   id: string
   name: string
+  mode: string
   type: string
   description: string | null
   documentCount: number
+  settings: RagSettings | null
   createdAt: string
   updatedAt: string
+}
+
+export interface RagSettings {
+  chunkSize?: number
+  chunkOverlap?: number
+  topK?: number
+  similarityThreshold?: number
 }
 
 export interface KnowledgeBaseDocument {
@@ -36,10 +45,10 @@ export const knowledgeBaseApi = {
   getById: (id: string) =>
     client.get(`/knowledge-bases/${id}`),
 
-  create: (data: { name: string; type: string; description?: string }) =>
+  create: (data: { name: string; mode: string; type: string; description?: string }) =>
     client.post('/knowledge-bases', data),
 
-  update: (id: string, data: { name?: string; description?: string }) =>
+  update: (id: string, data: { name?: string; description?: string; settings?: Record<string, unknown> }) =>
     client.put(`/knowledge-bases/${id}`, data),
 
   remove: (id: string) =>
@@ -55,6 +64,9 @@ export const knowledgeBaseApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+
+  deleteDocument: (id: string, docId: string) =>
+    client.delete(`/knowledge-bases/${id}/documents/${docId}`),
 
   reindex: (id: string, docId: string) =>
     client.post(`/knowledge-bases/${id}/documents/${docId}/reindex`),

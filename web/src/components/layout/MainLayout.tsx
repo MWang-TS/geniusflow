@@ -64,12 +64,14 @@ const MainLayout = () => {
   const assistantMenuItems = [
     { key: '/skill-assistant', icon: <MessageOutlined />, label: '技能对话' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库管理' },
+    { key: '/templates', icon: <AppstoreOutlined />, label: '模板市场' },
     { key: '/admin/ai-settings', icon: <RobotOutlined />, label: 'AI 角色配置' },
   ]
 
   const apiPlatformMenuItems = [
     { key: '/api-platform', icon: <KeyOutlined />, label: 'API 密钥管理' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库管理' },
+    { key: '/templates', icon: <AppstoreOutlined />, label: '模板市场' },
     { key: '/admin/ai-settings', icon: <ApiOutlined />, label: 'AI 角色配置' },
   ]
 

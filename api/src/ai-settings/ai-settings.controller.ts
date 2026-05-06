@@ -183,4 +183,16 @@ export class AiSettingsController {
   importConfig(@Body() data: any) {
     return this.service.importConfig(data)
   }
+
+  // ──── MinerU Settings ─────────────────────────────────────────────────────
+
+  @Get('system-config/mineru')
+  getMineruConfig() {
+    return this.service.getMineruConfig()
+  }
+
+  @Put('system-config/mineru')
+  saveMineruConfig(@Body() body: { apiKey: string }) {
+    return this.service.saveMineruConfig(body.apiKey)
+  }
 }

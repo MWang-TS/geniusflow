@@ -708,4 +708,23 @@ export class AiSettingsService {
     }
     return f
   }
+
+  // ──── MinerU System Config ─────────────────────────────────────────────────
+
+  async getMineruConfig() {
+    const cfg = await this.prisma.systemConfig.findUnique({ where: { key: 'mineru_api_key' } })
+    return {
+      hasKey: !!(cfg?.value),
+      apiKey: cfg?.value ? '***' + cfg.value.slice(-4) : '',
+    }
+  }
+
+  async saveMineruConfig(apiKey: string) {
+    await this.prisma.systemConfig.upsert({
+      where: { key: 'mineru_api_key' },
+      create: { key: 'mineru_api_key', value: apiKey },
+      update: { value: apiKey },
+    })
+    return { success: true }
+  }
 }

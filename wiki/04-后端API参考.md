@@ -4,7 +4,7 @@
 
 | 项目 | 值 |
 |------|-----|
-| Base URL（生产） | `http://localhost/api/v1` |
+| Base URL（生产） | `http://localhost:8080/api/v1` |
 | Base URL（本地开发） | `http://localhost:4001/api/v1` |
 | 内容类型 | `application/json` |
 | 认证方式 | Bearer Token（JWT） |
@@ -235,9 +235,81 @@ POST /node-instances/:id/submit
 | GET / POST | `/ai-settings/agent-roles` | 角色列表 / 创建 | admin |
 | PUT / DELETE | `/ai-settings/agent-roles/:id` | 更新 / 删除角色 | admin |
 
+### 全量导入导出
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/ai-settings/export` | 导出所有 AI 配置为 JSON（提供商/模型/Fallback/技能/角色） | admin |
+| POST | `/ai-settings/import` | 上传 JSON 一键导入所有 AI 配置 | admin |
+
 ---
 
-## 十三、AI 报告 `/ai-reports`
+## 十三、AI 助理对话 `/ai-assistant`
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| POST | `/ai-assistant/chat/stream` | 流式对话（SSE，支持 Function Calling） | 已登录 |
+
+**请求格式**
+```json
+POST /ai-assistant/chat/stream
+{
+  "message": "我想了解一下产品客户的常见问题",
+  "agentRoleId": "role-xxx",         // 可选，指定 Agent 角色
+  "knowledgeBaseIds": ["kb-id-1"],  // 可选，关联知识库
+  "history": [                      // 可选，对话历史
+    { "role": "user", "content": "..." },
+    { "role": "assistant", "content": "..." }
+  ]
+}
+```
+
+**SSE 流式响应（Content-Type: text/event-stream）**
+```
+data: {"type": "text", "content": "您好"}
+data: {"type": "text", "content": "，这是..."}
+data: {"type": "tool_call", "name": "search_knowledge"}
+data: {"type": "text", "content": "搜索到以下相关信息..."}
+data: {"type": "done"}
+```
+
+---
+
+## 十四、OpenAPI 密钥 `/open-api`
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/open-api/keys` | API 密钥列表 | admin / designer |
+| POST | `/open-api/keys` | 创建 API 密钥 | admin / designer |
+| DELETE | `/open-api/keys/:id` | 删除 API 密钥 | admin |
+
+**创建密钥请求**
+```json
+POST /open-api/keys
+{
+  "name": "客服系统集成密钥",
+  "agentRoleId": "role-xxx",            // 可选，绑定的 Agent 角色
+  "knowledgeBaseIds": ["kb-id-1"],     // 可选，绑定知识库
+  "expiresAt": "2027-01-01T00:00:00Z" // 可选，过期时间
+}
+```
+
+**创建响应**
+```json
+{
+  "data": {
+    "id": "key-xxx",
+    "name": "客服系统集成密钥",
+    "key": "gf-sk-xxxxxxxxxxxxxxxxxxxxxxxx",  // 仅创建时返回一次明文
+    "expiresAt": "2027-01-01T00:00:00Z",
+    "createdAt": "2026-05-06T00:00:00Z"
+  }
+}
+```
+
+---
+
+## 十五、AI 报告 `/ai-reports`
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
@@ -247,7 +319,7 @@ POST /node-instances/:id/submit
 
 ---
 
-## 十四、通知 `/notifications`
+## 十六、通知 `/notifications`
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
@@ -258,7 +330,7 @@ POST /node-instances/:id/submit
 
 ---
 
-## 十五、审计日志 `/audit-log`
+## 十七、审计日志 `/audit-log`
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
@@ -266,7 +338,7 @@ POST /node-instances/:id/submit
 
 ---
 
-## 十六、健康检查 `/health`
+## 十八、健康检查 `/health`
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -274,7 +346,7 @@ POST /node-instances/:id/submit
 
 ---
 
-## 十七、错误码说明
+## 十九、错误码说明
 
 | HTTP 状态码 | 含义 |
 |------------|------|

@@ -40,8 +40,10 @@ GeniusFlow 是一个面向企业的 **AI 增强流程管理平台**。业务人�
 | ✅ **审批中心** | 管理节点的审批工作流，AI 自动生成审批摘要 |
 | 📊 **进度监控** | 甘特图展示流程进度，自动预警延期风险 |
 | 📚 **知识库** | 文档上传与向量化，节点执行时 RAG 精准召回 |
-| 🤖 **AI 配置** | 多模型提供商管理、Agent 角色配置、降级链设置 |
-| 🏪 **模板市场** | 行业预设流程模板，一键复制使用 |
+| 🤖 **AI 配置** | 多模型提供商管理、Agent 角色配置、降级链设置、全量导入导出 |
+| 🏪 **模板市场** | 行业预设流程模板，按职能线筛选，一键复制使用 |
+| 💬 **AI 助理模式** | 企业知识库对话助理，支持 Function Calling（工具调用） |
+| 🔑 **AI 中台模式** | 提供 OpenAPI 密钥管理，供内部平台集成调用 |
 | 👥 **用户权限** | RBAC 角色管理，支持按角色配置可见页面 |
 
 ---
@@ -163,7 +165,7 @@ docker-compose exec api npx prisma migrate deploy
 docker-compose exec api npx prisma db seed
 ```
 
-访问 http://localhost（Nginx 默认 80 端口）
+访问 http://localhost:8080（Nginx 默认映射 8080 端口）
 
 ---
 
@@ -241,10 +243,7 @@ REDIS_URL=redis://localhost:6379
 
 | 邮箱 | 密码 | 角色 |
 |------|------|------|
-| admin@geniusflow.com | Admin123! | 系统管理员 |
-| designer@geniusflow.com | Test123! | 流程设计者 |
-| employee@geniusflow.com | Test123! | 执行员工 |
-| manager@geniusflow.com | Test123! | 管理者 |
+| admin@geniusflow.com | admin123 | 系统管理员 |
 
 > ⚠️ 生产环境请登录后立即修改默认密码。
 
@@ -257,6 +256,18 @@ REDIS_URL=redis://localhost:6379
 - `admin` 角色默认可访问所有页面
 - 其他角色的可见菜单 = 所属所有角色路由权限的并集
 - 菜单过滤和路由守卫双重保障，无权限访问返回 403
+
+---
+
+## 平台模式
+
+系统支持三种使用模式，在**登录页**切换，登录后自动跳转对应首页：
+
+| 模式 | 说明 | 首页路径 |
+|------|------|----------|
+| 🔄 **流程任务模式** | 设计并执行业务流程，AI 辅助质检与审批 | `/processes` |
+| 💬 **AI 助理模式** | 企业知识库对话助理，支持 Function Calling | `/skill-assistant` |
+| 🔑 **AI 中台模式** | 提供标准 API 接口，供内部平台集成使用 | `/api-platform` |
 
 ---
 

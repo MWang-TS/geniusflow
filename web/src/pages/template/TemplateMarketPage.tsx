@@ -1,24 +1,32 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Table, Button, Tag, Space, App, Input } from 'antd'
-import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
+import { Card, Button, Tag, Space, App, Input, Row, Col, Pagination, Spin, Empty, Typography, Select } from 'antd'
+import { CopyOutlined, ReloadOutlined, ApartmentOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { templateApi, type TemplateItem } from '../../api/template'
+
+const { Paragraph, Text } = Typography
+
+const FUNCTION_OPTIONS = [
+  '全部', '市场', '投标', '销售', '研发', '项目管理', '生产运营',
+  '仓储、物流、采购', '人事', '行政', '法务', '财务',
+  '质量', '客户关爱', 'EHS', '其它',
+]
 
 const TemplateMarketPage: React.FC = () => {
   const { message } = App.useApp()
   const navigate = useNavigate()
   const [data, setData] = useState<TemplateItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 })
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 12, total: 0 })
   const [cloning, setCloning] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
+  const [category, setCategory] = useState<string | undefined>(undefined)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchData = useCallback(async (page = 1, pageSize = 20, kw = keyword) => {
+  const fetchData = useCallback(async (page = 1, pageSize = 12, kw = keyword, cat = category) => {
     setLoading(true)
     try {
-      const res = await templateApi.list({ page, pageSize, keyword: kw || undefined })
+      const res = await templateApi.list({ page, pageSize, keyword: kw || undefined, category: cat || undefined })
       setData(res.data.list || [])
       setPagination(res.data.pagination)
     } catch {
@@ -26,16 +34,22 @@ const TemplateMarketPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [keyword, message])
+  }, [keyword, category, message])
 
-  useEffect(() => { fetchData(1, pagination.pageSize, keyword) }, [])
+  useEffect(() => { fetchData(1, 12, keyword, category) }, [])
 
   const handleSearch = (value: string) => {
     setKeyword(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      fetchData(1, pagination.pageSize, value)
+      fetchData(1, pagination.pageSize, value, category)
     }, 350)
+  }
+
+  const handleCategoryChange = (value: string | undefined) => {
+    const cat = value === '全部' ? undefined : value
+    setCategory(cat)
+    fetchData(1, pagination.pageSize, keyword, cat)
   }
 
   const handleClone = async (id: string) => {
@@ -54,55 +68,90 @@ const TemplateMarketPage: React.FC = () => {
     }
   }
 
-  const columns: ColumnsType<TemplateItem> = [
-    {
-      title: '模板名称', dataIndex: 'name', key: 'name', ellipsis: true,
-      render: (v: string, r) => (
-        <Space>
-          <span>{v}</span>
-          {r.isPreset && <Tag color="blue">官方</Tag>}
-        </Space>
-      ),
-    },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true, render: (v: string | null) => v || '-' },
-    { title: '分类', dataIndex: 'category', key: 'category', width: 100, render: (v: string | null) => v || '-' },
-    { title: '节点数', dataIndex: 'nodeCount', key: 'nodeCount', width: 80, align: 'center' },
-    {
-      title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160,
-      render: (v: string) => new Date(v).toLocaleString('zh-CN'),
-    },
-    {
-      title: '操作', key: 'actions', width: 120,
-      render: (_, record) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<CopyOutlined />}
-          loading={cloning === record.id}
-          onClick={() => handleClone(record.id)}
-        >
-          复制到我的流程
-        </Button>
-      ),
-    },
-  ]
-
   return (
     <Card title="模板市场" extra={
       <Space>
+        <Select
+          placeholder="按职能线筛选"
+          style={{ width: 160 }}
+          allowClear
+          value={category}
+          onChange={handleCategoryChange}
+          options={FUNCTION_OPTIONS.map(o => ({ label: o, value: o }))}
+        />
         <Input.Search
           placeholder="搜索模板名称或描述"
           style={{ width: 220 }}
           value={keyword}
           onChange={(e) => handleSearch(e.target.value)}
-          onSearch={(v) => fetchData(1, pagination.pageSize, v)}
+          onSearch={(v) => fetchData(1, pagination.pageSize, v, category)}
           allowClear
         />
-        <Button icon={<ReloadOutlined />} onClick={() => fetchData(1, pagination.pageSize, keyword)} />
+        <Button icon={<ReloadOutlined />} onClick={() => fetchData(1, pagination.pageSize, keyword, category)} />
       </Space>
     }>
-      <Table rowKey="id" columns={columns} dataSource={data} loading={loading}
-        pagination={{ ...pagination, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`, onChange: (p, ps) => fetchData(p, ps, keyword) }} />
+      <Spin spinning={loading}>
+        {data.length === 0 && !loading ? (
+          <Empty description="暂无模板" style={{ padding: '60px 0' }} />
+        ) : (
+          <>
+            <Row gutter={[16, 16]}>
+              {data.map(item => (
+                <Col key={item.id} xs={24} sm={12} md={8} lg={6}>
+                  <Card
+                    hoverable
+                    style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+                    styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column' } }}
+                    actions={[
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<CopyOutlined />}
+                        loading={cloning === item.id}
+                        onClick={() => handleClone(item.id)}
+                      >
+                        复制到我的流程
+                      </Button>
+                    ]}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <Space style={{ marginBottom: 8 }} wrap>
+                        <Text strong style={{ fontSize: 15 }}>{item.name}</Text>
+                        {item.isPreset && <Tag color="blue">官方</Tag>}
+                        {item.category && <Tag color="default">{item.category}</Tag>}
+                      </Space>
+                      <Paragraph
+                        type="secondary"
+                        ellipsis={{ rows: 3 }}
+                        style={{ marginBottom: 12, fontSize: 13 }}
+                      >
+                        {item.description || '暂无描述'}
+                      </Paragraph>
+                    </div>
+                    <Space style={{ fontSize: 12, color: '#999' }}>
+                      <ApartmentOutlined />
+                      <span>{item.nodeCount ?? 0} 个节点</span>
+                      <ClockCircleOutlined style={{ marginLeft: 8 }} />
+                      <span>{new Date(item.createdAt).toLocaleDateString('zh-CN')}</span>
+                    </Space>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+            <div style={{ textAlign: 'right', marginTop: 24 }}>
+              <Pagination
+                current={pagination.page}
+                pageSize={pagination.pageSize}
+                total={pagination.total}
+                showSizeChanger
+                pageSizeOptions={[12, 24, 48]}
+                showTotal={(t) => `共 ${t} 条`}
+                onChange={(p, ps) => fetchData(p, ps, keyword)}
+              />
+            </div>
+          </>
+        )}
+      </Spin>
     </Card>
   )
 }

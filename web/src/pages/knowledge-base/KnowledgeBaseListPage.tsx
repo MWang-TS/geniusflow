@@ -2,14 +2,25 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Tag, App, Tooltip, Modal, Input, Select } from 'antd'
 import {
   PlusOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined,
-  UploadOutlined, RedoOutlined,
+  UploadOutlined, RedoOutlined, DatabaseOutlined, BookOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { knowledgeBaseApi, type KnowledgeBaseItem, type KnowledgeBaseDocument } from '../../api/knowledge-base'
 
-const typeMap: Record<string, { color: string; label: string }> = {
-  standard: { color: 'blue', label: '标准/规范' },
-  expertise: { color: 'green', label: '专家技能' },
+const CATEGORIES = ['说明书', '会议纪要', '报告手册', '规范', '其他']
+
+const modeMap: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
+  rag: { color: 'blue', label: 'RAG', icon: <DatabaseOutlined /> },
+  wiki: { color: 'purple', label: 'Wiki', icon: <BookOutlined /> },
+}
+
+const categoryColors: Record<string, string> = {
+  '说明书': 'cyan',
+  '会议纪要': 'orange',
+  '报告手册': 'geekblue',
+  '规范': 'green',
+  '其他': 'default',
+  'general': 'default',
 }
 
 const statusColors: Record<string, string> = {
@@ -32,9 +43,9 @@ const KnowledgeBaseListPage: React.FC = () => {
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 })
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const [createOpen, setCreateOpen] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', type: 'standard', description: '' })
+  const [createForm, setCreateForm] = useState({ name: '', mode: 'rag', type: '说明书', description: '' })
   const [detailOpen, setDetailOpen] = useState(false)
-  const [detailKb, setDetailKb] = useState<KnowledgeBaseItem | null>(null)
+  const [detailKb] = useState<KnowledgeBaseItem | null>(null)
   const [docs, setDocs] = useState<KnowledgeBaseDocument[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
   const [docsPagination, setDocsPagination] = useState({ page: 1, pageSize: 10, total: 0 })
@@ -52,7 +63,7 @@ const KnowledgeBaseListPage: React.FC = () => {
     }
   }, [typeFilter, message])
 
-  useEffect(() => { fetchData() }, [typeFilter])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const fetchDocs = useCallback(async (kbId: string, page = 1, pageSize = 10) => {
     setDocsLoading(true)
@@ -72,7 +83,7 @@ const KnowledgeBaseListPage: React.FC = () => {
       await knowledgeBaseApi.create(createForm)
       message.success('创建成功')
       setCreateOpen(false)
-      setCreateForm({ name: '', type: 'standard', description: '' })
+      setCreateForm({ name: '', mode: 'rag', type: '说明书', description: '' })
       fetchData(1, pagination.pageSize)
     } catch {
       message.error('创建失败')
@@ -117,19 +128,25 @@ const KnowledgeBaseListPage: React.FC = () => {
   }
 
   const openDetail = (kb: KnowledgeBaseItem) => {
-    setDetailKb(kb)
-    setDetailOpen(true)
-    fetchDocs(kb.id, 1, 10)
+    if (kb.mode === 'wiki') {
+      window.location.href = `/knowledge-bases/${kb.id}/wiki`
+      return
+    }
+    window.location.href = `/knowledge-bases/${kb.id}/rag`
   }
 
   const columns: ColumnsType<KnowledgeBaseItem> = [
     { title: '名称', dataIndex: 'name', key: 'name', ellipsis: true },
     {
-      title: '类型', dataIndex: 'type', key: 'type', width: 110,
+      title: '模式', dataIndex: 'mode', key: 'mode', width: 80,
       render: (v: string) => {
-        const config = typeMap[v] || { color: 'default', label: v }
-        return <Tag color={config.color}>{config.label}</Tag>
+        const cfg = modeMap[v] || { color: 'default', label: v, icon: null }
+        return <Tag color={cfg.color} icon={cfg.icon}>{cfg.label}</Tag>
       },
+    },
+    {
+      title: '分类', dataIndex: 'type', key: 'type', width: 100,
+      render: (v: string) => <Tag color={categoryColors[v] || 'default'}>{v}</Tag>,
     },
     { title: '文档数', dataIndex: 'documentCount', key: 'documentCount', width: 80, align: 'center' },
     { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true, render: (v: string | null) => v || '-' },
@@ -172,11 +189,11 @@ const KnowledgeBaseListPage: React.FC = () => {
     <>
       <Card title="知识库" extra={
         <Space>
-          <Select placeholder="类型" allowClear style={{ width: 120 }} value={typeFilter}
+          <Select placeholder="模式筛选" allowClear style={{ width: 120 }} value={typeFilter}
             onChange={(v) => { setTypeFilter(v); fetchData(1, pagination.pageSize) }}
             options={[
-              { label: '标准/规范', value: 'standard' },
-              { label: '专家技能', value: 'expertise' },
+              { label: 'RAG 知识库', value: 'rag' },
+              { label: 'Wiki 知识库', value: 'wiki' },
             ]} />
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建</Button>
           <Button icon={<ReloadOutlined />} onClick={() => fetchData(1, pagination.pageSize)} />
@@ -187,20 +204,49 @@ const KnowledgeBaseListPage: React.FC = () => {
       </Card>
 
       <Modal open={createOpen} title="新建知识库" onCancel={() => setCreateOpen(false)} onOk={handleCreate}>
-        <div style={{ marginBottom: 12 }}>
-          <label>名称</label>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 6, fontWeight: 500 }}>名称</div>
           <Input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} placeholder="输入知识库名称" />
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>类型</label>
-          <Select value={createForm.type} onChange={(v) => setCreateForm({ ...createForm, type: v })} style={{ width: '100%' }}
-            options={[
-              { label: '标准/规范', value: 'standard' },
-              { label: '专家技能', value: 'expertise' },
-            ]} />
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 6, fontWeight: 500 }}>模式</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {([['rag', 'RAG 知识库', '向量检索召回'], ['wiki', 'Wiki 知识库', 'LLM 编译 Wiki 页']] as const).map(([val, label, desc]) => (
+              <div
+                key={val}
+                onClick={() => setCreateForm({ ...createForm, mode: val })}
+                style={{
+                  flex: 1,
+                  border: `2px solid ${createForm.mode === val ? (val === 'wiki' ? '#722ed1' : '#1677ff') : '#d9d9d9'}`,
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  background: createForm.mode === val ? (val === 'wiki' ? '#f9f0ff' : '#e6f4ff') : '#fff',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {val === 'rag'
+                  ? <DatabaseOutlined style={{ fontSize: 20, color: createForm.mode === 'rag' ? '#1677ff' : '#999' }} />
+                  : <BookOutlined style={{ fontSize: 20, color: createForm.mode === 'wiki' ? '#722ed1' : '#999' }} />
+                }
+                <div style={{ fontWeight: 600, marginTop: 4, fontSize: 13 }}>{label}</div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 6, fontWeight: 500 }}>文档分类</div>
+          <Select
+            value={createForm.type}
+            onChange={(v) => setCreateForm({ ...createForm, type: v })}
+            style={{ width: '100%' }}
+            options={CATEGORIES.map((c) => ({ label: c, value: c }))}
+          />
         </div>
         <div>
-          <label>描述</label>
+          <div style={{ marginBottom: 6, fontWeight: 500 }}>描述</div>
           <Input.TextArea value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} placeholder="可选描述" rows={3} />
         </div>
       </Modal>
@@ -211,7 +257,8 @@ const KnowledgeBaseListPage: React.FC = () => {
           <div>
             <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Space>
-                <Tag color={typeMap[detailKb.type]?.color}>{typeMap[detailKb.type]?.label}</Tag>
+                <Tag color={modeMap[detailKb.mode]?.color}>{modeMap[detailKb.mode]?.label ?? detailKb.mode}</Tag>
+                <Tag color={categoryColors[detailKb.type] || 'default'}>{detailKb.type}</Tag>
                 <span style={{ color: '#666' }}>{detailKb.description || '无描述'}</span>
               </Space>
               <label style={{ cursor: 'pointer' }}>

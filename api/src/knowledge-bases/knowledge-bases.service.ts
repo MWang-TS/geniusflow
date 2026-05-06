@@ -19,7 +19,7 @@ export class KnowledgeBasesService {
   async findAll(query: { type?: string; page: number; pageSize: number }) {
     const { type, page, pageSize } = query
     const where: Record<string, unknown> = {}
-    if (type) where.type = type
+    if (type) where.mode = type
 
     const [list, total] = await Promise.all([
       this.prisma.knowledgeBase.findMany({
@@ -36,11 +36,13 @@ export class KnowledgeBasesService {
       list: list.map((kb) => ({
         id: kb.id,
         name: kb.name,
+        mode: kb.mode,
         type: kb.type,
         description: kb.description,
         documentCount: kb._count.documents,
         createdAt: kb.createdAt,
         updatedAt: kb.updatedAt,
+        settings: kb.settings,
       })),
       pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     }
@@ -64,7 +66,8 @@ export class KnowledgeBasesService {
 
   async update(id: string, dto: UpdateKnowledgeBaseDto) {
     await this.findOne(id)
-    return this.prisma.knowledgeBase.update({ where: { id }, data: dto })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.prisma.knowledgeBase.update({ where: { id }, data: dto as any })
   }
 
   async remove(id: string) {
@@ -144,6 +147,17 @@ export class KnowledgeBasesService {
     this.processDocument(doc.id, filePath, file.originalname).catch(() => {})
 
     return doc
+  }
+
+  async deleteDocument(kbId: string, docId: string) {
+    const doc = await this.prisma.knowledgeBaseDocument.findFirst({
+      where: { id: docId, knowledgeBaseId: kbId },
+    })
+    if (!doc) throw new NotFoundException('文档不存在')
+    await this.prisma.documentChunk.deleteMany({ where: { documentId: docId } })
+    await this.prisma.knowledgeBaseDocument.delete({ where: { id: docId } })
+    try { if (fs.existsSync(doc.filePath)) fs.unlinkSync(doc.filePath) } catch {}
+    return { message: '删除成功' }
   }
 
   async retryVectorize(kbId: string, docId: string) {

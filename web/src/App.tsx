@@ -13,6 +13,8 @@ import NodeExecutionPage from './pages/my-tasks/NodeExecutionPage'
 import ApprovalListPage from './pages/approval/ApprovalListPage'
 import ApprovalDetailPage from './pages/approval/ApprovalDetailPage'
 import KnowledgeBaseListPage from './pages/knowledge-base/KnowledgeBaseListPage'
+import WikiKbDetailPage from './pages/knowledge-base/WikiKbDetailPage'
+import RagKbDetailPage from './pages/knowledge-base/RagKbDetailPage'
 import ProgressListPage from './pages/progress/ProgressListPage'
 import ProgressDetailPage from './pages/progress/ProgressDetailPage'
 import NotificationListPage from './pages/notifications/NotificationListPage'
@@ -62,6 +64,8 @@ function App() {
             <Route path="templates" element={<TemplateMarketPage />} />
             {/* ── Shared (Knowledge Base) ── */}
             <Route path="knowledge-bases" element={<KnowledgeBaseListPage />} />
+            <Route path="knowledge-bases/:kbId/wiki" element={<WikiKbDetailPage />} />
+            <Route path="knowledge-bases/:kbId/rag" element={<RagKbDetailPage />} />
             {/* ── Mode 2: Skill Assistant ── */}
             <Route path="skill-assistant" element={<SkillAssistantPage />} />
             {/* ── Mode 3: API Platform ── */}

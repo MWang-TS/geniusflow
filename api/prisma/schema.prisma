@@ -182,12 +182,16 @@ model Task {
 model KnowledgeBase {
   id          String   @id @default(uuid())
   name        String
+  mode        String   @default("rag")
   type        String
   description String?
+  settings    Json?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  documents KnowledgeBaseDocument[]
+  documents   KnowledgeBaseDocument[]
+  wikiSources WikiRawSource[]
+  wikiPages   WikiPage[]
 
   @@map("knowledge_bases")
 }
@@ -224,6 +228,52 @@ model DocumentChunk {
   document KnowledgeBaseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@map("document_chunks")
+}
+
+model WikiRawSource {
+  id               String   @id @default(uuid())
+  knowledgeBaseId  String   @map("knowledge_base_id")
+  fileName         String   @map("file_name")
+  filePath         String?  @map("file_path")
+  fileSize         BigInt   @default(0) @map("file_size")
+  mimeType         String?  @map("mime_type")
+  converterMode    String   @default("markitdown") @map("converter_mode") // markitdown | mineru
+  conversionStatus String   @default("pending") @map("conversion_status") // pending | processing | done | failed
+  markdownContent  String?  @map("markdown_content")
+  ingestStatus     String   @default("pending") @map("ingest_status") // pending | processing | done | failed
+  errorMessage     String?  @map("error_message")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@map("wiki_raw_sources")
+}
+
+model WikiPage {
+  id              String   @id @default(uuid())
+  knowledgeBaseId String   @map("knowledge_base_id")
+  slug            String
+  title           String
+  content         String
+  pageType        String   @default("concept") @map("page_type") // concept | entity | source | index | log
+  tags            String[]
+  sourceFile      String?  @map("source_file")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@unique([knowledgeBaseId, slug])
+  @@map("wiki_pages")
+}
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_configs")
 }
 
 model AiAgentLog {

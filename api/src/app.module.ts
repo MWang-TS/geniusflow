@@ -23,6 +23,7 @@ import { AiSettingsModule } from './ai-settings/ai-settings.module'
 import { AiAssistantModule } from './ai-assistant/ai-assistant.module'
 import { SkillChatModule } from './skill-chat/skill-chat.module'
 import { OpenApiModule } from './open-api/open-api.module'
+import { WikiModule } from './wiki/wiki.module'
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { OpenApiModule } from './open-api/open-api.module'
     AiAssistantModule,
     SkillChatModule,
     OpenApiModule,
+    WikiModule,
   ],
 })
 export class AppModule {}
