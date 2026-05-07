@@ -1,6 +1,6 @@
 import React from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
-import { Result } from 'antd'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Button, Result } from 'antd'
 import { useAuthStore } from '@/stores/auth.store'
 
 interface RouteGuardProps {
@@ -9,15 +9,35 @@ interface RouteGuardProps {
 }
 
 const RouteGuard: React.FC<RouteGuardProps> = ({ roles, children }) => {
-  const { isAuthenticated, user, allowedRoutes } = useAuthStore()
+  const { isAuthenticated, user, allowedRoutes, logout } = useAuthStore()
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const renderNoPermission = () => (
+    <Result
+      status="403"
+      title="403"
+      subTitle="抱歉，您没有权限访问此页面。"
+      extra={(
+        <Button
+          type="primary"
+          onClick={() => {
+            logout()
+            navigate('/login', { replace: true })
+          }}
+        >
+          重新登录
+        </Button>
+      )}
+    />
+  )
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
   if (roles && !roles.some((role) => user?.roles?.includes(role))) {
-    return <Result status="403" title="403" subTitle="抱歉，您没有权限访问此页面。" />
+    return renderNoPermission()
   }
 
   // allowedRoutes === null 表示 admin，全部可见；非 null 则检查当前路径
@@ -27,7 +47,7 @@ const RouteGuard: React.FC<RouteGuardProps> = ({ roles, children }) => {
     // admin 页面以外的路由都需要权限，admin 本身已通过 roles 检查保护
     const isAdminPath = path.startsWith('/admin')
     if (!isAdminPath && !allowed && path !== '/') {
-      return <Result status="403" title="403" subTitle="抱歉，您没有权限访问此页面。" />
+      return renderNoPermission()
     }
   }
 

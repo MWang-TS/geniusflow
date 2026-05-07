@@ -11,6 +11,9 @@ describe('NodeInstancesService', () => {
   let prisma: any
   let queueService: any
   let wsGateway: any
+  const employeeUser = { userId: 'u-1', roles: ['employee'] }
+  const otherEmployee = { userId: 'u-2', roles: ['employee'] }
+  const managerUser = { userId: 'u-manager', roles: ['manager'] }
 
   const mockNodeDef = {
     id: 'nd-1',
@@ -37,7 +40,8 @@ describe('NodeInstancesService', () => {
     assignee: { id: 'u-1', name: 'Alice' },
     history: [],
     aiReports: [],
-    instance: { id: 'pi-1', definition: { id: 'def-1', name: '测试流程' } },
+    tasks: [{ assigneeUserId: 'u-1' }],
+    instance: { id: 'pi-1', createdBy: 'u-1', definition: { id: 'def-1', name: '测试流程' } },
   }
 
   beforeEach(async () => {
@@ -73,7 +77,7 @@ describe('NodeInstancesService', () => {
   describe('findOne', () => {
     it('should return node instance with relations', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue(mockNode)
-      const result = await service.findOne('ni-1')
+      const result = await service.findOne('ni-1', employeeUser)
       expect(result.id).toBe('ni-1')
       expect(prisma.nodeInstance.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'ni-1' } }),
@@ -82,7 +86,18 @@ describe('NodeInstancesService', () => {
 
     it('should throw NotFoundException when node does not exist', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue(null)
-      await expect(service.findOne('missing')).rejects.toThrow(NotFoundException)
+      await expect(service.findOne('missing', employeeUser)).rejects.toThrow(NotFoundException)
+    })
+
+    it('should hide unrelated node instances from employees', async () => {
+      prisma.nodeInstance.findUnique.mockResolvedValue({
+        ...mockNode,
+        assigneeUserId: 'u-3',
+        tasks: [{ assigneeUserId: 'u-3' }],
+        instance: { ...mockNode.instance, createdBy: 'u-3' },
+      })
+
+      await expect(service.findOne('ni-1', otherEmployee)).rejects.toThrow(NotFoundException)
     })
   })
 
@@ -95,7 +110,7 @@ describe('NodeInstancesService', () => {
         inputData: { field1: 'value1' },
         outputData: {},
         percentComplete: 50,
-      })
+      }, employeeUser)
       expect(prisma.nodeInstance.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'ni-1' } }),
       )
@@ -104,12 +119,18 @@ describe('NodeInstancesService', () => {
 
     it('should throw NotFoundException when node does not exist', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue(null)
-      await expect(service.save('missing', {})).rejects.toThrow(NotFoundException)
+      await expect(service.save('missing', {}, employeeUser)).rejects.toThrow(NotFoundException)
     })
 
     it('should throw ConflictException when node is not in_progress', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue({ ...mockNode, status: 'completed' })
-      await expect(service.save('ni-1', {})).rejects.toThrow(ConflictException)
+      await expect(service.save('ni-1', {}, employeeUser)).rejects.toThrow(ConflictException)
+    })
+
+    it('should prevent other employees from saving node data', async () => {
+      prisma.nodeInstance.findUnique.mockResolvedValue(mockNode)
+
+      await expect(service.save('ni-1', {}, otherEmployee)).rejects.toThrow(ConflictException)
     })
   })
 
@@ -121,7 +142,7 @@ describe('NodeInstancesService', () => {
       const result = await service.submit(
         'ni-1',
         { inputData: { field: 'val' }, outputData: { doc: 'report' } },
-        'u-1',
+        employeeUser,
       )
 
       expect(queueService.addInspectorJob).toHaveBeenCalledWith(
@@ -147,24 +168,33 @@ describe('NodeInstancesService', () => {
       prisma.processInstance.update.mockResolvedValue({})
       prisma.nodeDefinition.findMany.mockResolvedValue([])
 
-      const result = await service.submit('ni-1', {}, 'u-1')
+      const result = await service.submit('ni-1', {}, employeeUser)
       expect(queueService.addInspectorJob).not.toHaveBeenCalled()
       expect(result.status).toBe('completed')
     })
 
     it('should throw ConflictException when node is not in_progress', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue({ ...mockNode, status: 'pending_approval' })
-      await expect(service.submit('ni-1', {}, 'u-1')).rejects.toThrow(ConflictException)
+      await expect(service.submit('ni-1', {}, employeeUser)).rejects.toThrow(ConflictException)
     })
 
     it('should throw ConflictException when submitter is not the assignee', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue(mockNode)
-      await expect(service.submit('ni-1', {}, 'other-user')).rejects.toThrow(ConflictException)
+      await expect(service.submit('ni-1', {}, otherEmployee)).rejects.toThrow(ConflictException)
+    })
+
+    it('should allow managers to submit on behalf of the executor', async () => {
+      prisma.nodeInstance.findUnique.mockResolvedValue(mockNode)
+      prisma.nodeInstance.update.mockResolvedValue({ ...mockNode, status: 'ai_inspecting' })
+
+      const result = await service.submit('ni-1', {}, managerUser)
+
+      expect(result.status).toBe('ai_inspecting')
     })
 
     it('should throw NotFoundException when node does not exist', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue(null)
-      await expect(service.submit('missing', {}, 'u-1')).rejects.toThrow(NotFoundException)
+      await expect(service.submit('missing', {}, employeeUser)).rejects.toThrow(NotFoundException)
     })
   })
 
@@ -173,7 +203,7 @@ describe('NodeInstancesService', () => {
       prisma.nodeInstance.findUnique.mockResolvedValue(mockNode)
       prisma.nodeInstance.update.mockResolvedValue({ ...mockNode, percentComplete: 75 })
 
-      const result = await service.updateProgress('ni-1', { percentComplete: 75 })
+      const result = await service.updateProgress('ni-1', { percentComplete: 75 }, employeeUser)
       expect(prisma.nodeInstance.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { percentComplete: 75 } }),
       )
@@ -182,7 +212,7 @@ describe('NodeInstancesService', () => {
 
     it('should throw NotFoundException when node does not exist', async () => {
       prisma.nodeInstance.findUnique.mockResolvedValue(null)
-      await expect(service.updateProgress('missing', { percentComplete: 50 })).rejects.toThrow(NotFoundException)
+      await expect(service.updateProgress('missing', { percentComplete: 50 }, employeeUser)).rejects.toThrow(NotFoundException)
     })
   })
 })

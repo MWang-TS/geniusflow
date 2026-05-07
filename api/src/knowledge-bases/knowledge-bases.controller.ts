@@ -1,8 +1,9 @@
 import {
   Controller, Get, Post, Put, Delete, Param, Body, Query,
-  UseGuards, UseInterceptors, UploadedFile,
+  UseGuards, UseInterceptors, UploadedFile, BadRequestException,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/roles.guard'
 import { Roles } from '../auth/roles.decorator'
@@ -64,11 +65,14 @@ export class KnowledgeBasesController {
 
   @Post(':id/documents')
   @Roles('admin')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   uploadDocument(
     @Param('id') id: string,
     @UploadedFile() file: any,
   ) {
+    if (!file) {
+      throw new BadRequestException('未收到文件，请检查上传格式')
+    }
     return this.service.uploadDocument(id, file)
   }
 

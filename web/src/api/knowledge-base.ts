@@ -60,9 +60,8 @@ export const knowledgeBaseApi = {
   uploadDocument: (id: string, file: File) => {
     const form = new FormData()
     form.append('file', file)
-    return client.post(`/knowledge-bases/${id}/documents`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    // Do NOT set Content-Type manually; axios will set multipart/form-data with the correct boundary
+    return client.post(`/knowledge-bases/${id}/documents`, form)
   },
 
   deleteDocument: (id: string, docId: string) =>

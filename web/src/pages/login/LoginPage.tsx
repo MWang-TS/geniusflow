@@ -4,14 +4,9 @@ import { Form, Input, Button, Card, message, Typography, Segmented } from 'antd'
 import { UserOutlined, LockOutlined, NodeIndexOutlined, RobotOutlined, ApiOutlined } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth.store'
 import { usePlatformModeStore, PLATFORM_MODES, type PlatformMode } from '@/stores/platform-mode.store'
+import { resolveHomeRoute } from '@/config/defaultRoutes'
 
 const { Title, Text } = Typography
-
-const MODE_DEFAULT_ROUTES: Record<PlatformMode, string> = {
-  workflow: '/processes',
-  assistant: '/skill-assistant',
-  'api-platform': '/api-platform',
-}
 
 const MODE_ICONS: Record<PlatformMode, React.ReactNode> = {
   workflow: <NodeIndexOutlined />,
@@ -26,12 +21,13 @@ interface LoginForm {
 
 const LoginPage = () => {
   const navigate = useNavigate()
-  const { login, isAuthenticated } = useAuthStore()
+  const { login, isAuthenticated, allowedRoutes } = useAuthStore()
   const { mode, setMode } = usePlatformModeStore()
   const [loading, setLoading] = useState(false)
+  const homeRoute = resolveHomeRoute(mode, allowedRoutes)
 
   if (isAuthenticated) {
-    return <Navigate to={MODE_DEFAULT_ROUTES[mode]} replace />
+    return <Navigate to={homeRoute} replace />
   }
 
   const handleLogin = async (values: LoginForm) => {
@@ -39,7 +35,7 @@ const LoginPage = () => {
     try {
       await login(values)
       message.success('登录成功')
-      navigate(MODE_DEFAULT_ROUTES[mode])
+      navigate(resolveHomeRoute(mode, useAuthStore.getState().allowedRoutes))
     } catch (error: any) {
       const msg = error?.response?.data?.message || '登录失败，请检查邮箱和密码'
       message.error(msg)

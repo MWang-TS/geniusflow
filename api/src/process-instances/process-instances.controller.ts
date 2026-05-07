@@ -20,28 +20,28 @@ export class ProcessInstancesController {
   constructor(private readonly service: ProcessInstancesService) {}
 
   @Get()
-  findAll(@Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('status') status?: string) {
+  findAll(@Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('status') status?: string, @Req() req?: any) {
     return this.service.findAll({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
       status,
-    })
+    }, req.user)
   }
 
   @Get(':id/gantt')
-  getGanttData(@Param('id') id: string) {
-    return this.service.getGanttData(id)
+  getGanttData(@Param('id') id: string, @Req() req: any) {
+    return this.service.getGanttData(id, req.user)
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id)
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.service.findOne(id, req.user)
   }
 
   @Post()
   @Roles('designer', 'manager', 'admin')
   create(@Body() dto: CreateProcessInstanceDto, @Req() req: any) {
-    return this.service.create(dto, req.user.userId)
+    return this.service.create(dto, req.user)
   }
 
   @Post(':id/terminate')
@@ -52,7 +52,7 @@ export class ProcessInstancesController {
 
   @Post(':id/baseline')
   @Roles('manager', 'admin')
-  updateBaseline(@Param('id') id: string, @Body() dto: UpdateBaselineDto) {
-    return this.service.updateBaseline(id, dto)
+  updateBaseline(@Param('id') id: string, @Body() dto: UpdateBaselineDto, @Req() req: any) {
+    return this.service.updateBaseline(id, dto, req.user)
   }
 }

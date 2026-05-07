@@ -18,4 +18,9 @@ export class ChatRequestDto {
   @ValidateNested({ each: true })
   @Type(() => ChatMessageDto)
   history?: ChatMessageDto[]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  knowledgeBaseIds?: string[]
 }

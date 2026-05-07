@@ -7,6 +7,11 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { CreateProcessInstanceDto } from './dto/create-process-instance.dto'
 
+type AuthUser = {
+  userId: string
+  roles?: string[]
+}
+
 @Injectable()
 export class ProcessInstancesService {
   constructor(
@@ -14,7 +19,7 @@ export class ProcessInstancesService {
     private auditLog: AuditLogService,
   ) {}
 
-  async create(dto: CreateProcessInstanceDto, userId: string) {
+  async create(dto: CreateProcessInstanceDto, user: AuthUser) {
     const definition = await this.prisma.processDefinition.findUnique({
       where: { id: dto.definitionId },
       include: { nodes: { orderBy: { sortOrder: 'asc' } } },
@@ -41,7 +46,7 @@ export class ProcessInstancesService {
         status: 'running',
         plannedStartDate: plannedStart,
         actualStartDate: new Date(),
-        createdBy: userId,
+        createdBy: user.userId,
       },
     })
 
@@ -125,9 +130,9 @@ export class ProcessInstancesService {
       })
     }
 
-    const result = await this.findOne(instance.id)
+    const result = await this.findOne(instance.id, user)
     await this.auditLog.record({
-      userId,
+      userId: user.userId,
       action: 'create_instance',
       resourceType: 'process_instance',
       resourceId: instance.id,
@@ -136,10 +141,10 @@ export class ProcessInstancesService {
     return result
   }
 
-  async findAll(query: { page: number; pageSize: number; status?: string }) {
+  async findAll(query: { page: number; pageSize: number; status?: string }, user: AuthUser) {
     const { page, pageSize, status } = query
 
-    const where: Record<string, unknown> = {}
+    const where: Record<string, unknown> = this.buildVisibilityWhere(user)
     if (status) where.status = status
 
     const [list, total] = await Promise.all([
@@ -174,9 +179,9 @@ export class ProcessInstancesService {
     }
   }
 
-  async findOne(id: string) {
-    const instance = await this.prisma.processInstance.findUnique({
-      where: { id },
+  async findOne(id: string, user: AuthUser) {
+    const instance = await this.prisma.processInstance.findFirst({
+      where: { id, ...this.buildVisibilityWhere(user) },
       include: {
         definition: { select: { id: true, name: true } },
         creator: { select: { id: true, name: true } },
@@ -197,9 +202,9 @@ export class ProcessInstancesService {
     return instance
   }
 
-  async getGanttData(id: string) {
-    const instance = await this.prisma.processInstance.findUnique({
-      where: { id },
+  async getGanttData(id: string, user: AuthUser) {
+    const instance = await this.prisma.processInstance.findFirst({
+      where: { id, ...this.buildVisibilityWhere(user) },
       include: {
         definition: { select: { name: true } },
         nodeInstances: {
@@ -243,7 +248,7 @@ export class ProcessInstancesService {
     }
   }
 
-  async updateBaseline(id: string, dto: { plannedStartDate?: string; nodeAdjustments?: Array<{ nodeInstanceId: string; plannedStartDate: string; plannedEndDate: string }> }) {
+  async updateBaseline(id: string, dto: { plannedStartDate?: string; nodeAdjustments?: Array<{ nodeInstanceId: string; plannedStartDate: string; plannedEndDate: string }> }, user: AuthUser) {
     const instance = await this.prisma.processInstance.findUnique({ where: { id } })
     if (!instance) throw new NotFoundException('流程实例不存在')
 
@@ -266,7 +271,7 @@ export class ProcessInstancesService {
       }
     }
 
-    return this.getGanttData(id)
+    return this.getGanttData(id, user)
   }
 
   async terminate(id: string, reason: string, userId: string) {
@@ -326,5 +331,23 @@ export class ProcessInstancesService {
     })
 
     return { success: true, status: 'terminated' }
+  }
+
+  private hasOversightAccess(user: AuthUser) {
+    return (user.roles || []).some((role) => role === 'admin' || role === 'manager')
+  }
+
+  private buildVisibilityWhere(user: AuthUser) {
+    if (this.hasOversightAccess(user)) {
+      return {}
+    }
+
+    return {
+      OR: [
+        { createdBy: user.userId },
+        { nodeInstances: { some: { assigneeUserId: user.userId } } },
+        { nodeInstances: { some: { tasks: { some: { assigneeUserId: user.userId } } } } },
+      ],
+    }
   }
 }

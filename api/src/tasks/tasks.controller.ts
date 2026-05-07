@@ -24,13 +24,18 @@ export class TasksController {
         page: page ? parseInt(page, 10) : 1,
         pageSize: pageSize ? parseInt(pageSize, 10) : 20,
       },
-      req.user.userId,
+      req.user,
     )
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id)
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.service.findOne(id, req.user)
+  }
+
+  @Post(':id/status')
+  updateStatus(@Param('id') id: string, @Body('status') status: string, @Req() req: any) {
+    return this.service.updateStatus(id, status, req.user)
   }
 
   @Post(':id/approve')

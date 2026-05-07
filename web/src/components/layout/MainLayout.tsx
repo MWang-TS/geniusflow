@@ -41,9 +41,9 @@ const MainLayout = () => {
   }
 
   const workflowMenuItems = [
+    { key: '/my-tasks', icon: <CheckSquareOutlined />, label: '任务看板' },
     { key: '/processes', icon: <NodeIndexOutlined />, label: '流程管理' },
     { key: '/instances', icon: <ProjectOutlined />, label: '流程实例' },
-    { key: '/my-tasks', icon: <CheckSquareOutlined />, label: '我的任务' },
     { key: '/approvals', icon: <FileTextOutlined />, label: '审批中心' },
     { key: '/progress', icon: <BarChartOutlined />, label: '进度监控' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库' },

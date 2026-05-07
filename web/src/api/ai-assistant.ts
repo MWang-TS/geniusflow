@@ -25,6 +25,7 @@ export async function streamChat(
   history: ChatMessage[],
   onChunk: (chunk: ChatChunk) => void,
   signal?: AbortSignal,
+  knowledgeBaseIds?: string[],
 ): Promise<void> {
   const token = getToken()
   const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
@@ -35,7 +36,7 @@ export async function streamChat(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, knowledgeBaseIds: knowledgeBaseIds ?? [] }),
     signal,
   })
 

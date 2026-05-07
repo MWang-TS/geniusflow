@@ -2,17 +2,12 @@ import { Segmented } from 'antd'
 import { NodeIndexOutlined, RobotOutlined, ApiOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { usePlatformModeStore, PLATFORM_MODES, type PlatformMode } from '@/stores/platform-mode.store'
+import { MODE_DEFAULT_ROUTES } from '@/config/defaultRoutes'
 
 const ICONS: Record<PlatformMode, React.ReactNode> = {
   workflow: <NodeIndexOutlined />,
   assistant: <RobotOutlined />,
   'api-platform': <ApiOutlined />,
-}
-
-const MODE_DEFAULT_ROUTES: Record<PlatformMode, string> = {
-  workflow: '/processes',
-  assistant: '/skill-assistant',
-  'api-platform': '/api-platform',
 }
 
 interface ModeSwitcherProps {

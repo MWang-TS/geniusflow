@@ -269,7 +269,7 @@ const NodeExecutionPage: React.FC = () => {
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 0' }}>
       <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/my-tasks')}
-        style={{ marginBottom: 16 }}>返回任务列表</Button>
+        style={{ marginBottom: 16 }}>返回任务看板</Button>
 
       <Card title={
         <Space>

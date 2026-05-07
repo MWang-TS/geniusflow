@@ -7,6 +7,8 @@ import { AuditLogService } from '../audit-log/audit-log.service'
 describe('ProcessInstancesService', () => {
   let service: ProcessInstancesService
   let prisma: any
+  const employeeUser = { userId: 'u-1', roles: ['employee'] }
+  const managerUser = { userId: 'u-manager', roles: ['manager'] }
 
   const mockDefinition = {
     id: 'pd-1', name: '测试流程', status: 'published',
@@ -25,7 +27,7 @@ describe('ProcessInstancesService', () => {
   beforeEach(async () => {
     prisma = {
       processDefinition: { findUnique: jest.fn() },
-      processInstance: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+      processInstance: { create: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       nodeInstance: { create: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
       nodeInstanceHistory: { create: jest.fn() },
       task: { create: jest.fn(), updateMany: jest.fn() },
@@ -46,19 +48,19 @@ describe('ProcessInstancesService', () => {
   describe('create', () => {
     it('should throw if definition not found', async () => {
       prisma.processDefinition.findUnique.mockResolvedValue(null)
-      await expect(service.create({ definitionId: 'x' }, 'u-1'))
+      await expect(service.create({ definitionId: 'x' }, employeeUser))
         .rejects.toThrow(NotFoundException)
     })
 
     it('should throw if definition not published', async () => {
       prisma.processDefinition.findUnique.mockResolvedValue({ ...mockDefinition, status: 'draft' })
-      await expect(service.create({ definitionId: 'pd-1' }, 'u-1'))
+      await expect(service.create({ definitionId: 'pd-1' }, employeeUser))
         .rejects.toThrow(ConflictException)
     })
 
     it('should throw if definition has no nodes', async () => {
       prisma.processDefinition.findUnique.mockResolvedValue({ ...mockDefinition, nodes: [] })
-      await expect(service.create({ definitionId: 'pd-1' }, 'u-1'))
+      await expect(service.create({ definitionId: 'pd-1' }, employeeUser))
         .rejects.toThrow(ConflictException)
     })
 
@@ -67,9 +69,9 @@ describe('ProcessInstancesService', () => {
       prisma.processInstance.create.mockResolvedValue({ id: 'pi-1', definitionId: 'pd-1' })
       prisma.nodeInstance.create.mockResolvedValue({ id: 'ni-1', definition: { id: 'nd-1' }, plannedEndDate: new Date() })
       prisma.nodeInstanceHistory.create.mockResolvedValue({})
-      prisma.processInstance.findUnique.mockResolvedValue(mockInstance)
+      prisma.processInstance.findFirst.mockResolvedValue(mockInstance)
 
-      const result = await service.create({ definitionId: 'pd-1' }, 'u-1')
+      const result = await service.create({ definitionId: 'pd-1' }, employeeUser)
       expect(result.id).toBe('pi-1')
       expect(prisma.processInstance.create).toHaveBeenCalled()
       expect(prisma.nodeInstance.create).toHaveBeenCalledTimes(1)
@@ -80,22 +82,48 @@ describe('ProcessInstancesService', () => {
     it('should return paginated list', async () => {
       prisma.processInstance.findMany.mockResolvedValue([mockInstance])
       prisma.processInstance.count.mockResolvedValue(1)
-      const result = await service.findAll({ page: 1, pageSize: 20 })
+      const result = await service.findAll({ page: 1, pageSize: 20 }, employeeUser)
       expect(result.list).toHaveLength(1)
       expect(result.pagination.total).toBe(1)
+    })
+
+    it('should scope normal users to related process instances only', async () => {
+      prisma.processInstance.findMany.mockResolvedValue([])
+      prisma.processInstance.count.mockResolvedValue(0)
+
+      await service.findAll({ page: 1, pageSize: 20 }, employeeUser)
+
+      expect(prisma.processInstance.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.any(Array),
+          }),
+        }),
+      )
+    })
+
+    it('should allow managers to see all process instances', async () => {
+      prisma.processInstance.findMany.mockResolvedValue([mockInstance])
+      prisma.processInstance.count.mockResolvedValue(1)
+
+      await service.findAll({ page: 1, pageSize: 20 }, managerUser)
+
+      expect(prisma.processInstance.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      )
     })
   })
 
   describe('findOne', () => {
     it('should return instance detail', async () => {
-      prisma.processInstance.findUnique.mockResolvedValue(mockInstance)
-      const result = await service.findOne('pi-1')
+      prisma.processInstance.findFirst.mockResolvedValue(mockInstance)
+      const result = await service.findOne('pi-1', employeeUser)
       expect(result.id).toBe('pi-1')
     })
 
     it('should throw if not found', async () => {
-      prisma.processInstance.findUnique.mockResolvedValue(null)
-      await expect(service.findOne('pi-1')).rejects.toThrow(NotFoundException)
+      prisma.processInstance.findFirst.mockResolvedValue(null)
+      await expect(service.findOne('pi-1', employeeUser)).rejects.toThrow(NotFoundException)
     })
   })
 
@@ -110,8 +138,8 @@ describe('ProcessInstancesService', () => {
           definition: { nodeName: '任务1' }, assignee: { name: '张三' },
         }],
       }
-      prisma.processInstance.findUnique.mockResolvedValue(instWithNodes)
-      const result = await service.getGanttData('pi-1')
+      prisma.processInstance.findFirst.mockResolvedValue(instWithNodes)
+      const result = await service.getGanttData('pi-1', employeeUser)
       expect(result.tasks).toHaveLength(1)
       expect(result.tasks[0].name).toBe('任务1')
       expect(result.tasks[0].duration).toBeGreaterThanOrEqual(3)

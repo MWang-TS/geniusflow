@@ -5,11 +5,15 @@ export interface TaskListItem {
   nodeInstanceId: string
   processInstanceId: string
   processName: string
+  processStatus: string
   nodeName: string
   type: string
   status: string
+  nodeStatus: string
+  percentComplete: number
   dueDate: string | null
   createdAt: string
+  actionPath: string
 }
 
 export interface ApprovalTaskDetail {
@@ -65,6 +69,9 @@ export interface ApprovalTaskDetail {
 export const taskApi = {
   list: (params?: { type?: string; status?: string; page?: number; pageSize?: number }) =>
     client.get('/tasks', { params }),
+
+  updateStatus: (id: string, status: 'pending' | 'in_progress') =>
+    client.post(`/tasks/${id}/status`, { status }),
 
   getById: (id: string) =>
     client.get<any, { code: number; data: ApprovalTaskDetail }>(`/tasks/${id}`),

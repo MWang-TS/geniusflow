@@ -124,18 +124,21 @@ export class KnowledgeBasesService {
       throw new Error('文件大小超过 50MB 限制')
     }
 
+    // Multer decodes the filename as Latin-1; re-encode to get the correct UTF-8 string
+    const originalname = Buffer.from(file.originalname, 'latin1').toString('utf8')
+
     const uploadDir = path.resolve('uploads', 'knowledge', kbId)
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true })
     }
 
-    const filePath = path.join(uploadDir, `${Date.now()}_${file.originalname}`)
+    const filePath = path.join(uploadDir, `${Date.now()}_${originalname}`)
     fs.writeFileSync(filePath, file.buffer)
 
     const doc = await this.prisma.knowledgeBaseDocument.create({
       data: {
         knowledgeBaseId: kbId,
-        fileName: file.originalname,
+        fileName: originalname,
         filePath,
         fileSize: file.size,
         mimeType: file.mimetype,
@@ -144,9 +147,9 @@ export class KnowledgeBasesService {
       },
     })
 
-    this.processDocument(doc.id, filePath, file.originalname).catch(() => {})
+    this.processDocument(doc.id, filePath, originalname).catch(() => {})
 
-    return doc
+    return { ...doc, fileSize: Number(doc.fileSize) }
   }
 
   async deleteDocument(kbId: string, docId: string) {

@@ -7,6 +7,11 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { NodeInstancesService } from '../node-instances/node-instances.service'
 
+type AuthUser = {
+  userId: string
+  roles?: string[]
+}
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -15,10 +20,13 @@ export class TasksService {
     private auditLog: AuditLogService,
   ) {}
 
-  async findAll(query: { type?: string; status?: string; page: number; pageSize: number }, userId: string) {
+  async findAll(query: { type?: string; status?: string; page: number; pageSize: number }, user: AuthUser) {
     const { type, status, page, pageSize } = query
 
-    const where: Record<string, unknown> = { assigneeUserId: userId }
+    const where: Record<string, unknown> = {}
+    if (!this.hasOversightAccess(user)) {
+      where.assigneeUserId = user.userId
+    }
     if (type) where.type = type
     if (status) where.status = status
 
@@ -46,17 +54,72 @@ export class TasksService {
         nodeInstanceId: t.nodeInstanceId,
         processInstanceId: t.nodeInstance.instance.id,
         processName: t.nodeInstance.instance.definition.name,
+        processStatus: t.nodeInstance.instance.status,
         nodeName: t.nodeInstance.definition.nodeName,
         type: t.type,
         status: t.status,
+        nodeStatus: t.nodeInstance.status,
+        percentComplete: t.nodeInstance.percentComplete,
         dueDate: t.dueDate,
         createdAt: t.createdAt,
+        actionPath:
+          t.type === 'approve'
+            ? `/approvals/${t.id}`
+            : `/my-tasks/${t.nodeInstanceId}/execute`,
       })),
       pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     }
   }
 
-  async findOne(taskId: string) {
+  async updateStatus(taskId: string, status: string, user: AuthUser) {
+    if (!['pending', 'in_progress'].includes(status)) {
+      throw new ConflictException('任务看板仅支持在待处理和进行中之间流转')
+    }
+
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        nodeInstance: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    })
+
+    if (!task) throw new NotFoundException('任务不存在')
+    if (!this.hasOversightAccess(user) && task.assigneeUserId !== user.userId) {
+      throw new ConflictException('只能更新自己的任务状态')
+    }
+    if (!['pending', 'in_progress'].includes(task.status)) {
+      throw new ConflictException('当前任务状态不允许通过看板拖拽变更')
+    }
+    if (!['in_progress', 'pending_approval'].includes(task.nodeInstance.status)) {
+      throw new ConflictException('当前流程阶段不支持看板拖拽')
+    }
+
+    const updated = await this.prisma.task.update({
+      where: { id: taskId },
+      data: { status },
+    })
+
+    await this.auditLog.record({
+      userId: user.userId,
+      action: 'update_task_status',
+      resourceType: 'task',
+      resourceId: taskId,
+      details: {
+        fromStatus: task.status,
+        toStatus: status,
+        via: 'kanban',
+      },
+    })
+
+    return updated
+  }
+
+  async findOne(taskId: string, user: AuthUser) {
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: {
@@ -85,6 +148,9 @@ export class TasksService {
       },
     })
     if (!task) throw new NotFoundException('审批任务不存在')
+    if (!this.hasOversightAccess(user) && task.assigneeUserId !== user.userId) {
+      throw new NotFoundException('审批任务不存在')
+    }
     if (task.type !== 'approve') throw new ConflictException('该任务不是审批任务')
     return task
   }
@@ -178,5 +244,9 @@ export class TasksService {
     })
 
     return { status: 'in_progress', message: '已驳回，等待员工修改后重新提交' }
+  }
+
+  private hasOversightAccess(user: AuthUser) {
+    return (user.roles || []).some((role) => role === 'admin' || role === 'manager')
   }
 }

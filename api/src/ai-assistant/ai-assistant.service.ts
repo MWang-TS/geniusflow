@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { Response } from 'express'
 
@@ -138,13 +139,21 @@ const TOOLS = [
 
 @Injectable()
 export class AiAssistantService {
-  constructor(private prisma: PrismaService) {}
+  private readonly aiServiceUrl: string
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {
+    this.aiServiceUrl = this.config.get<string>('AI_SERVICE_URL') || 'http://ai-service:5000'
+  }
 
   async chat(
     userId: string,
     userRoles: string[],
     message: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    knowledgeBaseIds: string[] = [],
     res: Response,
   ) {
     // Get default chat model
@@ -170,8 +179,32 @@ export class AiAssistantService {
 
     const userContext = `当前用户：${user?.name || userId}（${userRoles.join('、')}）`
 
+    // RAG: search knowledge bases if provided
+    let knowledgeContext = ''
+    if (knowledgeBaseIds.length > 0) {
+      try {
+        const searchRes = await fetch(`${this.aiServiceUrl}/ai/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: message, knowledgeBaseIds, topK: 6 }),
+          signal: AbortSignal.timeout(10000),
+        })
+        if (searchRes.ok) {
+          const searchData = (await searchRes.json()) as { chunks: Array<{ content: string; score: number }> }
+          const relevantChunks = searchData.chunks.filter((c) => c.score > 0.3)
+          if (relevantChunks.length > 0) {
+            knowledgeContext = '\n\n## 相关知识库内容\n' + relevantChunks.map((c, i) => `[知识片段 ${i + 1}]\n${c.content}`).join('\n\n')
+          }
+        }
+      } catch {
+        // RAG failure is non-fatal
+      }
+    }
+
+    const systemPrompt = `${SYSTEM_PROMPT}\n\n${userContext}${knowledgeContext}`
+
     const messages: Message[] = [
-      { role: 'system', content: `${SYSTEM_PROMPT}\n\n${userContext}` },
+      { role: 'system', content: systemPrompt },
       ...history.map((h) => ({ role: h.role, content: h.content })),
       { role: 'user', content: message },
     ]

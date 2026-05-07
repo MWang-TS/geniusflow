@@ -44,7 +44,7 @@ const ApprovalDetailPage: React.FC = () => {
     try {
       await taskApi.approve(taskId, comment || '同意通过')
       message.success('审批通过')
-      navigate('/approvals')
+      navigate('/my-tasks')
     } catch {
       message.error('操作失败')
     } finally {
@@ -62,7 +62,7 @@ const ApprovalDetailPage: React.FC = () => {
     try {
       await taskApi.reject(taskId, comment)
       message.success('已驳回')
-      navigate('/approvals')
+      navigate('/my-tasks')
     } catch {
       message.error('操作失败')
     } finally {
@@ -224,8 +224,8 @@ const ApprovalDetailPage: React.FC = () => {
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 0' }}>
       <Button type="text" icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/approvals')}
-        style={{ marginBottom: 16 }}>返回审批列表</Button>
+        onClick={() => navigate('/my-tasks')}
+        style={{ marginBottom: 16 }}>返回任务看板</Button>
 
       <Card title={
         <Space>

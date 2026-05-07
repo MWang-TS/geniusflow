@@ -8,6 +8,11 @@ import { QueueService } from '../queue/queue.service'
 import { WsGateway } from '../ws/ws.gateway'
 import { SaveNodeInstanceDto, SubmitNodeInstanceDto, UpdateProgressDto } from './dto/node-instance.dto'
 
+type AuthUser = {
+  userId: string
+  roles?: string[]
+}
+
 @Injectable()
 export class NodeInstancesService {
   constructor(
@@ -16,7 +21,7 @@ export class NodeInstancesService {
     private wsGateway: WsGateway,
   ) {}
 
-  async findOne(id: string) {
+  async findOne(id: string, user: AuthUser) {
     const node = await this.prisma.nodeInstance.findUnique({
       where: { id },
       include: {
@@ -35,19 +40,23 @@ export class NodeInstancesService {
         history: { orderBy: { createdAt: 'desc' }, take: 20 },
         aiReports: { orderBy: { createdAt: 'desc' }, take: 1 },
         instance: {
-          select: { id: true, definition: { select: { id: true, name: true } } },
+          select: { id: true, createdBy: true, definition: { select: { id: true, name: true } } },
         },
+        tasks: { select: { assigneeUserId: true } },
       },
     })
     if (!node) {
       throw new NotFoundException('节点实例不存在')
     }
-    return node
+    this.assertCanViewNode(node, user)
+    const { tasks, ...visibleNode } = node
+    return visibleNode
   }
 
-  async save(id: string, dto: SaveNodeInstanceDto) {
+  async save(id: string, dto: SaveNodeInstanceDto, user: AuthUser) {
     const node = await this.prisma.nodeInstance.findUnique({ where: { id } })
     if (!node) throw new NotFoundException('节点实例不存在')
+    this.assertCanActOnNode(node, user)
     if (node.status !== 'in_progress') {
       throw new ConflictException('只能保存进行中节点的数据')
     }
@@ -60,17 +69,18 @@ export class NodeInstancesService {
     return this.prisma.nodeInstance.update({ where: { id }, data })
   }
 
-  async submit(id: string, dto: SubmitNodeInstanceDto, userId: string) {
+  async submit(id: string, dto: SubmitNodeInstanceDto, user: AuthUser) {
     const node = await this.prisma.nodeInstance.findUnique({
       where: { id },
-      include: { definition: true },
+      include: { definition: true, instance: { select: { createdBy: true } } },
     })
     if (!node) throw new NotFoundException('节点实例不存在')
+    this.assertCanActOnNode(node, user)
     if (node.status !== 'in_progress') {
       throw new ConflictException('只能提交进行中的节点')
     }
 
-    if (node.assigneeUserId && node.assigneeUserId !== userId) {
+    if (!this.hasOversightAccess(user) && node.assigneeUserId && node.assigneeUserId !== user.userId) {
       throw new ConflictException('只有节点执行人才能提交')
     }
 
@@ -98,7 +108,7 @@ export class NodeInstancesService {
         data: {
           nodeInstanceId: id,
           eventType: 'submit',
-          actorUserId: userId,
+          actorUserId: user.userId,
           fromStatus: 'in_progress',
           toStatus: 'ai_inspecting',
         },
@@ -112,7 +122,7 @@ export class NodeInstancesService {
         outputData: (dto.outputData || {}) as Record<string, unknown>,
         acceptanceCriteria: (inputSpec?.acceptanceCriteria as string) || '',
         qualityStandard: (outputSpec?.qualityStandard as string) || '',
-        userId,
+        userId: user.userId,
       })
 
       return {
@@ -129,7 +139,7 @@ export class NodeInstancesService {
         data: {
           nodeInstanceId: id,
           eventType: 'submit',
-          actorUserId: userId,
+          actorUserId: user.userId,
           fromStatus: 'in_progress',
           toStatus: 'completed',
         },
@@ -140,9 +150,10 @@ export class NodeInstancesService {
     }
   }
 
-  async updateProgress(id: string, dto: UpdateProgressDto) {
+  async updateProgress(id: string, dto: UpdateProgressDto, user: AuthUser) {
     const node = await this.prisma.nodeInstance.findUnique({ where: { id } })
     if (!node) throw new NotFoundException('节点实例不存在')
+    this.assertCanActOnNode(node, user)
 
     return this.prisma.nodeInstance.update({
       where: { id },
@@ -213,6 +224,34 @@ export class NodeInstancesService {
         where: { id: instanceId },
         data: { status: 'completed' },
       })
+    }
+  }
+
+  private hasOversightAccess(user: AuthUser) {
+    return (user.roles || []).some((role) => role === 'admin' || role === 'manager')
+  }
+
+  private assertCanViewNode(node: { assigneeUserId?: string | null; instance?: { createdBy?: string | null }; tasks?: Array<{ assigneeUserId?: string | null }> }, user: AuthUser) {
+    if (this.hasOversightAccess(user)) {
+      return
+    }
+
+    const related =
+      node.assigneeUserId === user.userId ||
+      node.instance?.createdBy === user.userId ||
+      (node.tasks || []).some((task) => task.assigneeUserId === user.userId)
+
+    if (!related) {
+      throw new NotFoundException('节点实例不存在')
+    }
+  }
+
+  private assertCanActOnNode(node: { assigneeUserId?: string | null }, user: AuthUser) {
+    if (this.hasOversightAccess(user)) {
+      return
+    }
+    if (node.assigneeUserId !== user.userId) {
+      throw new ConflictException('只有节点执行人才能修改任务进度')
     }
   }
 }

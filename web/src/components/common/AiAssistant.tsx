@@ -1,16 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Button, Input, Tooltip, Spin, Typography } from 'antd'
+import { Button, Input, Tooltip, Spin, Typography, Select } from 'antd'
 import {
   RobotOutlined,
   CloseOutlined,
   SendOutlined,
   ClearOutlined,
   LoadingOutlined,
+  BookOutlined,
 } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { streamChat, type ChatMessage } from '../../api/ai-assistant'
 import { useAiAssistantStore } from '../../stores/ai-assistant.store'
+import { knowledgeBaseApi, type KnowledgeBaseItem } from '../../api/knowledge-base'
 
 const { Text } = Typography
 
@@ -27,6 +29,9 @@ export default function AiAssistant() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [thinkingText, setThinkingText] = useState('')
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([])
+  const [selectedKbIds, setSelectedKbIds] = useState<string[]>([])
+  const [showKbSelector, setShowKbSelector] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -35,6 +40,13 @@ export default function AiAssistant() {
   const clearPending = useAiAssistantStore((s) => s.clearPending)
   // Ref so the effect can call the latest handleSend without stale closure
   const sendRef = useRef<((text: string) => Promise<void>) | null>(null)
+
+  useEffect(() => {
+    knowledgeBaseApi.list().then((res: any) => {
+      const list = res?.data?.list ?? []
+      setKnowledgeBases(Array.isArray(list) ? list : [])
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -100,6 +112,7 @@ export default function AiAssistant() {
           }
         },
         ctrl.signal,
+        selectedKbIds,
       )
     } catch (e: unknown) {
       if ((e as Error).name !== 'AbortError') {
@@ -114,7 +127,7 @@ export default function AiAssistant() {
       setThinkingText('')
       abortRef.current = null
     }
-  }, [input, loading, messages])
+  }, [input, loading, messages, selectedKbIds])
 
   // Keep sendRef up to date so the pending effect can always call latest version
   useEffect(() => {
@@ -239,6 +252,15 @@ export default function AiAssistant() {
               <span style={{ fontWeight: 600, fontSize: 15 }}>GeniusFlow AI助手</span>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
+              <Tooltip title="选择知识库">
+                <Button
+                  type="text"
+                  icon={<BookOutlined />}
+                  size="small"
+                  style={{ color: selectedKbIds.length > 0 ? '#fff' : 'rgba(255,255,255,0.65)', fontWeight: selectedKbIds.length > 0 ? 600 : undefined }}
+                  onClick={() => setShowKbSelector((v) => !v)}
+                />
+              </Tooltip>
               <Tooltip title="清空对话">
                 <Button
                   type="text"
@@ -257,6 +279,23 @@ export default function AiAssistant() {
               />
             </div>
           </div>
+
+          {/* KB selector panel */}
+          {showKbSelector && (
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', background: '#fafafa', flexShrink: 0 }}>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>选择知识库（可多选）</div>
+              <Select
+                mode="multiple"
+                allowClear
+                size="small"
+                placeholder="不选则不检索知识库"
+                value={selectedKbIds}
+                onChange={setSelectedKbIds}
+                style={{ width: '100%' }}
+                options={knowledgeBases.map((kb) => ({ label: kb.name, value: kb.id }))}
+              />
+            </div>
+          )}
 
           {/* Messages */}
           <div

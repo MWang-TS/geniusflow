@@ -20,22 +20,22 @@ export class NodeInstancesController {
   constructor(private readonly service: NodeInstancesService) {}
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id)
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.service.findOne(id, req.user)
   }
 
   @Post(':id/save')
-  save(@Param('id') id: string, @Body() dto: SaveNodeInstanceDto) {
-    return this.service.save(id, dto)
+  save(@Param('id') id: string, @Body() dto: SaveNodeInstanceDto, @Req() req: any) {
+    return this.service.save(id, dto, req.user)
   }
 
   @Post(':id/submit')
   submit(@Param('id') id: string, @Body() dto: SubmitNodeInstanceDto, @Req() req: any) {
-    return this.service.submit(id, dto, req.user.userId)
+    return this.service.submit(id, dto, req.user)
   }
 
   @Post(':id/progress')
-  updateProgress(@Param('id') id: string, @Body() dto: UpdateProgressDto) {
-    return this.service.updateProgress(id, dto)
+  updateProgress(@Param('id') id: string, @Body() dto: UpdateProgressDto, @Req() req: any) {
+    return this.service.updateProgress(id, dto, req.user)
   }
 }

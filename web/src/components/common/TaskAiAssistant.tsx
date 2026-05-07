@@ -23,6 +23,7 @@ interface TaskAiAssistantProps {
   open: boolean
   onClose: () => void
   nodeContext: NodeContext
+  knowledgeBaseIds?: string[]
 }
 
 interface DisplayMessage {
@@ -54,7 +55,7 @@ function buildContextPrompt(ctx: NodeContext): string {
   return lines.join('\n\n')
 }
 
-export default function TaskAiAssistant({ open, onClose, nodeContext }: TaskAiAssistantProps) {
+export default function TaskAiAssistant({ open, onClose, nodeContext, knowledgeBaseIds = [] }: TaskAiAssistantProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -119,6 +120,7 @@ export default function TaskAiAssistant({ open, onClose, nodeContext }: TaskAiAs
             }
           },
           ctrl.signal,
+          knowledgeBaseIds,
         )
       } catch (e: unknown) {
         if ((e as Error).name !== 'AbortError') {

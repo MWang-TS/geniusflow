@@ -25,6 +25,6 @@ export class AiAssistantController {
     res.setHeader('X-Accel-Buffering', 'no')
     res.flushHeaders()
 
-    await this.service.chat(userId, roles, dto.message, dto.history ?? [], res)
+    await this.service.chat(userId, roles, dto.message, dto.history ?? [], dto.knowledgeBaseIds ?? [], res)
   }
 }

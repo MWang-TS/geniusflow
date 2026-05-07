@@ -42,13 +42,47 @@ def get_db():
     return conn
 
 
+def get_default_embedding_model():
+    """Query DB for the default embedding model and its provider config."""
+    conn = psycopg2.connect(settings.DATABASE_URL)
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT m.model_id, p.api_key, p.base_url
+            FROM ai_models m
+            JOIN ai_providers p ON m.provider_id = p.id
+            WHERE m.type = 'embedding'
+              AND m.is_default = true
+              AND m.is_enabled = true
+              AND p.is_enabled = true
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def build_embedding_client():
+    """Return (AsyncOpenAI client, model_id) using DB config or env fallback."""
+    from openai import AsyncOpenAI
+    db_model = get_default_embedding_model()
+    if db_model and db_model.get("api_key"):
+        client = AsyncOpenAI(
+            api_key=db_model["api_key"],
+            base_url=db_model.get("base_url") or None,
+        )
+        return client, db_model["model_id"]
+    # Fallback to env vars
+    return AsyncOpenAI(api_key=settings.OPENAI_API_KEY), settings.EMBEDDING_MODEL
+
+
 @router.post("/embed", response_model=EmbeddingResponse)
 async def embed(request: EmbeddingRequest):
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        client, model_id = build_embedding_client()
         result = await client.embeddings.create(
-            model=settings.EMBEDDING_MODEL,
+            model=model_id,
             input=request.texts,
         )
         embeddings = [d.embedding for d in result.data]
@@ -60,10 +94,9 @@ async def embed(request: EmbeddingRequest):
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest):
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        client, model_id = build_embedding_client()
         query_embedding_resp = await client.embeddings.create(
-            model=settings.EMBEDDING_MODEL,
+            model=model_id,
             input=[request.query],
         )
         query_embedding = query_embedding_resp.data[0].embedding

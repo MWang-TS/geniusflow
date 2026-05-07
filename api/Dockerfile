@@ -13,6 +13,7 @@ RUN npm ci --fetch-retry-maxtimeout=60000 --fetch-retries=5
 # Copy all source (including prisma schema) before generating client
 COPY . .
 RUN npx prisma generate
+RUN rm -f tsconfig.tsbuildinfo
 RUN npm run build
 
 EXPOSE 4000

@@ -25,6 +25,16 @@ import AiSettingsPage from './pages/admin/ai-settings/AiSettingsPage'
 import SkillAssistantPage from './pages/skill-assistant/SkillAssistantPage'
 import ApiPlatformPage from './pages/api-platform/ApiPlatformPage'
 import AiAssistant from './components/common/AiAssistant'
+import { useAuthStore } from './stores/auth.store'
+import { usePlatformModeStore } from './stores/platform-mode.store'
+import { resolveHomeRoute } from './config/defaultRoutes'
+
+function HomeRedirect() {
+  const allowedRoutes = useAuthStore((state) => state.allowedRoutes)
+  const mode = usePlatformModeStore((state) => state.mode)
+
+  return <Navigate to={resolveHomeRoute(mode, allowedRoutes)} replace />
+}
 
 function App() {
   return (
@@ -48,7 +58,7 @@ function App() {
               </RouteGuard>
             }
           >
-            <Route index element={<Navigate to="/processes" replace />} />
+            <Route index element={<HomeRedirect />} />
             {/* ── Mode 1: Workflow ── */}
             <Route path="processes" element={<ProcessListPage />} />
             <Route path="instances" element={<ProcessInstanceListPage />} />
