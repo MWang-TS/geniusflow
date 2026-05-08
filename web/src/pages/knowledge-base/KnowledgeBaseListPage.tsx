@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Card, Table, Button, Space, Tag, App, Tooltip, Modal, Input, Select } from 'antd'
+import { Card, Table, Button, Space, Tag, App, Tooltip, Modal, Input, Select, Row, Col, Pagination, Spin, Empty, Typography } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import {
   PlusOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined,
-  UploadOutlined, RedoOutlined, DatabaseOutlined, BookOutlined,
+  UploadOutlined, RedoOutlined, DatabaseOutlined, BookOutlined, FileOutlined, EditOutlined, CheckOutlined, CloseOutlined,
 } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
 import { knowledgeBaseApi, type KnowledgeBaseItem, type KnowledgeBaseDocument } from '../../api/knowledge-base'
+
+const { Paragraph, Text } = Typography
 
 const CATEGORIES = ['说明书', '会议纪要', '报告手册', '规范', '其他']
 
@@ -46,6 +48,8 @@ const KnowledgeBaseListPage: React.FC = () => {
   const [createForm, setCreateForm] = useState({ name: '', mode: 'rag', type: '说明书', description: '' })
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailKb] = useState<KnowledgeBaseItem | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [docs, setDocs] = useState<KnowledgeBaseDocument[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
   const [docsPagination, setDocsPagination] = useState({ page: 1, pageSize: 10, total: 0 })
@@ -89,6 +93,26 @@ const KnowledgeBaseListPage: React.FC = () => {
       message.error('创建失败')
     }
   }
+
+  const handleRenameStart = (item: KnowledgeBaseItem) => {
+    setRenamingId(item.id)
+    setRenameValue(item.name)
+  }
+
+  const handleRenameConfirm = async (id: string) => {
+    const trimmed = renameValue.trim()
+    if (!trimmed) { message.warning('名称不能为空'); return }
+    try {
+      await knowledgeBaseApi.update(id, { name: trimmed })
+      message.success('重命名成功')
+      setData(prev => prev.map(kb => kb.id === id ? { ...kb, name: trimmed } : kb))
+      setRenamingId(null)
+    } catch {
+      message.error('重命名失败')
+    }
+  }
+
+  const handleRenameCancel = () => setRenamingId(null)
 
   const handleDelete = (id: string, name: string) => {
     modal.confirm({
@@ -135,33 +159,6 @@ const KnowledgeBaseListPage: React.FC = () => {
     window.location.href = `/knowledge-bases/${kb.id}/rag`
   }
 
-  const columns: ColumnsType<KnowledgeBaseItem> = [
-    { title: '名称', dataIndex: 'name', key: 'name', ellipsis: true },
-    {
-      title: '模式', dataIndex: 'mode', key: 'mode', width: 80,
-      render: (v: string) => {
-        const cfg = modeMap[v] || { color: 'default', label: v, icon: null }
-        return <Tag color={cfg.color} icon={cfg.icon}>{cfg.label}</Tag>
-      },
-    },
-    {
-      title: '分类', dataIndex: 'type', key: 'type', width: 100,
-      render: (v: string) => <Tag color={categoryColors[v] || 'default'}>{v}</Tag>,
-    },
-    { title: '文档数', dataIndex: 'documentCount', key: 'documentCount', width: 80, align: 'center' },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true, render: (v: string | null) => v || '-' },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170, render: (v: string) => new Date(v).toLocaleString('zh-CN') },
-    {
-      title: '操作', key: 'actions', width: 130,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="查看文档"><Button type="primary" size="small" icon={<EyeOutlined />} onClick={() => openDetail(record)} /></Tooltip>
-          <Tooltip title="删除"><Button danger size="small" icon={<DeleteOutlined />} onClick={() => handleDelete(record.id, record.name)} /></Tooltip>
-        </Space>
-      ),
-    },
-  ]
-
   const docColumns: ColumnsType<KnowledgeBaseDocument> = [
     { title: '文件名', dataIndex: 'fileName', key: 'fileName', ellipsis: true },
     { title: '大小', dataIndex: 'fileSize', key: 'fileSize', width: 90, render: (v: number) => v > 1024 * 1024 ? `${(v / 1024 / 1024).toFixed(1)} MB` : `${(v / 1024).toFixed(1)} KB` },
@@ -199,8 +196,91 @@ const KnowledgeBaseListPage: React.FC = () => {
           <Button icon={<ReloadOutlined />} onClick={() => fetchData(1, pagination.pageSize)} />
         </Space>
       }>
-        <Table rowKey="id" columns={columns} dataSource={data} loading={loading}
-          pagination={{ ...pagination, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`, onChange: (p, ps) => fetchData(p, ps) }} />
+        <Spin spinning={loading}>
+          {data.length === 0 && !loading ? (
+            <Empty description="暂无知识库" style={{ padding: '60px 0' }} />
+          ) : (
+            <>
+              <Row gutter={[16, 16]}>
+                {data.map(item => {
+                  const modeCfg = modeMap[item.mode] || { color: 'default', label: item.mode, icon: <DatabaseOutlined /> }
+                  return (
+                    <Col key={item.id} xs={24} sm={12} md={8} lg={6}>
+                      <Card
+                        hoverable
+                        style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+                        styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column' } }}
+                        actions={[
+                          <Tooltip title="查看详情" key="view">
+                            <Button type="primary" size="small" icon={<EyeOutlined />} onClick={() => openDetail(item)}>
+                              查看
+                            </Button>
+                          </Tooltip>,
+                          <Tooltip title="删除" key="delete">
+                            <Button danger size="small" icon={<DeleteOutlined />} onClick={() => handleDelete(item.id, item.name)}>
+                              删除
+                            </Button>
+                          </Tooltip>,
+                        ]}
+                      >
+                        <div style={{ flex: 1 }}>
+                          {renamingId === item.id ? (
+                            <Input
+                              size="small"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onPressEnter={() => handleRenameConfirm(item.id)}
+                              autoFocus
+                              style={{ marginBottom: 8, fontWeight: 600 }}
+                              suffix={
+                                <Space size={4}>
+                                  <CheckOutlined style={{ color: '#52c41a', cursor: 'pointer' }} onClick={() => handleRenameConfirm(item.id)} />
+                                  <CloseOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={handleRenameCancel} />
+                                </Space>
+                              }
+                            />
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                              <Text strong style={{ fontSize: 15, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</Text>
+                              <EditOutlined style={{ color: '#999', cursor: 'pointer', flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); handleRenameStart(item) }} />
+                            </div>
+                          )}
+                          <Space style={{ marginBottom: 10 }} wrap>
+                            <Tag color={modeCfg.color} icon={modeCfg.icon}>{modeCfg.label}</Tag>
+                            <Tag color={categoryColors[item.type] || 'default'}>{item.type}</Tag>
+                          </Space>
+                          <Paragraph
+                            type="secondary"
+                            ellipsis={{ rows: 2 }}
+                            style={{ marginBottom: 12, fontSize: 13 }}
+                          >
+                            {item.description || '暂无描述'}
+                          </Paragraph>
+                        </div>
+                        <Space style={{ fontSize: 12, color: '#999' }}>
+                          <FileOutlined />
+                          <span>{item.documentCount} 个文档</span>
+                          <span style={{ marginLeft: 8 }}>{new Date(item.createdAt).toLocaleDateString('zh-CN')}</span>
+                        </Space>
+                      </Card>
+                    </Col>
+                  )
+                })}
+              </Row>
+              <div style={{ textAlign: 'right', marginTop: 24 }}>
+                <Pagination
+                  current={pagination.page}
+                  pageSize={pagination.pageSize}
+                  total={pagination.total}
+                  showSizeChanger
+                  pageSizeOptions={[12, 24, 48]}
+                  showTotal={(t) => `共 ${t} 条`}
+                  onChange={(p, ps) => fetchData(p, ps)}
+                />
+              </div>
+            </>
+          )}
+        </Spin>
       </Card>
 
       <Modal open={createOpen} title="新建知识库" onCancel={() => setCreateOpen(false)} onOk={handleCreate}>

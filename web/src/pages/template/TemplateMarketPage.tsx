@@ -69,7 +69,7 @@ const TemplateMarketPage: React.FC = () => {
   }
 
   return (
-    <Card title="模板市场" extra={
+    <Card title="流程模版库" extra={
       <Space>
         <Select
           placeholder="按职能线筛选"

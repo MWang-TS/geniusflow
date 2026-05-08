@@ -40,7 +40,6 @@ export class KnowledgeBasesController {
   }
 
   @Put(':id')
-  @Roles('admin')
   update(@Param('id') id: string, @Body() dto: UpdateKnowledgeBaseDto) {
     return this.service.update(id, dto)
   }

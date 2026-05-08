@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Table, Button, Space, Tag, Select, App, Tooltip, Typography, Segmented, Row, Col, Statistic, Empty, Progress } from 'antd'
+import { Card, Table, Button, Space, Tag, Select, App, Tooltip, Segmented, Empty } from 'antd'
 import { ReloadOutlined, PlayCircleOutlined, ApartmentOutlined, CheckCircleOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { taskApi, type TaskListItem } from '../../api/task'
-
-const { Text } = Typography
 
 const typeMap: Record<string, { color: string; label: string }> = {
   execute: { color: 'blue', label: '执行' },
@@ -207,11 +205,12 @@ const MyTasksPage: React.FC = () => {
     },
   ]
 
-  const renderTaskCard = (task: TaskListItem) => {
+  const renderTaskCard = (task: TaskListItem, laneAccent: string = '#1677ff') => {
     const lane = getBoardLane(task)
     const taskStatus = statusMap[task.status] || { color: 'default', label: task.status }
     const nodeStatus = nodeStatusMap[task.nodeStatus] || { color: 'default', label: task.nodeStatus }
     const isDraggingEnabled = ['pending', 'in_progress'].includes(lane)
+    const isDragging = draggingTaskId === task.id
 
     return (
       <div
@@ -225,39 +224,104 @@ const MyTasksPage: React.FC = () => {
         }}
         onDragEnd={() => setDraggingTaskId(null)}
         style={{
-          background: '#fff',
-          border: draggingTaskId === task.id ? '1px solid #1677ff' : '1px solid #f0f0f0',
-          borderRadius: 16,
-          padding: 14,
-          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
-          opacity: movingTaskId === task.id ? 0.6 : 1,
+          background: isDragging ? `${laneAccent}12` : 'rgba(255,255,255,0.82)',
+          border: isDragging ? `1.5px solid ${laneAccent}55` : '1px solid rgba(0,0,0,0.06)',
+          borderRadius: 20,
+          padding: '18px 18px 16px',
+          boxShadow: isDragging
+            ? `0 12px 40px ${laneAccent}33`
+            : '0 2px 16px rgba(0,0,0,0.08), 0 0.5px 2px rgba(0,0,0,0.04)',
+          opacity: movingTaskId === task.id ? 0.45 : 1,
           cursor: isDraggingEnabled ? 'grab' : 'default',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          transition: 'box-shadow 0.2s, opacity 0.2s',
         }}
       >
-        <Space size={[6, 6]} wrap style={{ marginBottom: 10 }}>
-          <Tag color={typeMap[task.type]?.color || 'default'}>{typeMap[task.type]?.label || task.type}</Tag>
-          <Tag color={taskStatus.color}>{taskStatus.label}</Tag>
-          <Tag color={nodeStatus.color}>{nodeStatus.label}</Tag>
-        </Space>
-        <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>{task.nodeName}</div>
-        <div style={{ color: 'rgba(0,0,0,0.65)', fontSize: 13, marginBottom: 12 }}>{task.processName}</div>
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <Text type="secondary">节点进度</Text>
-            <Text>{task.percentComplete}%</Text>
+        {/* SF-style accent dot + process name */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: laneAccent, flexShrink: 0, boxShadow: `0 0 6px ${laneAccent}88` }} />
+          <span style={{ fontSize: 11, color: '#8e8e93', fontWeight: 500, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {task.processName}
+          </span>
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 15, color: '#1c1c1e', marginBottom: 12, lineHeight: 1.4, letterSpacing: '-0.015em' }}>
+          {task.nodeName}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+          {[typeMap[task.type]?.label || task.type, taskStatus.label, nodeStatus.label].map((label) => (
+            <span key={label} style={{
+              background: 'rgba(0,0,0,0.05)',
+              color: '#3c3c43',
+              fontSize: 11,
+              fontWeight: 600,
+              padding: '3px 10px',
+              borderRadius: 99,
+              letterSpacing: '0.01em',
+            }}>{label}</span>
+          ))}
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: '#aeaeb2', fontWeight: 500 }}>节点进度</span>
+            <span style={{ fontSize: 11, color: laneAccent, fontWeight: 700 }}>{task.percentComplete}%</span>
           </div>
-          <Progress percent={task.percentComplete} size="small" showInfo={false} strokeColor="#1677ff" />
+          <div style={{ height: 6, borderRadius: 99, background: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${task.percentComplete}%`, borderRadius: 99, background: `linear-gradient(90deg, ${laneAccent}bb, ${laneAccent})`, transition: 'width 0.4s ease' }} />
+          </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
-          <span>创建于 {new Date(task.createdAt).toLocaleDateString('zh-CN')}</span>
-          <span>{task.dueDate ? `截止 ${new Date(task.dueDate).toLocaleDateString('zh-CN')}` : '无截止日期'}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 11, color: '#aeaeb2' }}>
+            {new Date(task.createdAt).toLocaleDateString('zh-CN')}
+          </span>
+          {task.dueDate ? (
+            <span style={{ fontSize: 11, color: '#FF9F0A', fontWeight: 700, background: '#FF9F0A15', padding: '2px 8px', borderRadius: 99 }}>
+              截止 {new Date(task.dueDate).toLocaleDateString('zh-CN')}
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, color: '#c7c7cc' }}>无截止</span>
+          )}
         </div>
-        <Space>
-          <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => navigate(task.actionPath)}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => navigate(task.actionPath)}
+            style={{
+              flex: 1,
+              background: `linear-gradient(135deg, ${laneAccent}dd 0%, ${laneAccent} 100%)`,
+              border: 'none',
+              borderRadius: 12,
+              padding: '8px 12px',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#fff',
+              cursor: 'pointer',
+              boxShadow: `0 4px 14px ${laneAccent}44`,
+              letterSpacing: '-0.01em',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 5,
+            }}
+          >
             {task.type === 'approve' ? '进入审批' : '打开任务'}
-          </Button>
-          <Button onClick={() => navigate(`/instances/${task.processInstanceId}`)}>流程详情</Button>
-        </Space>
+          </button>
+          <button
+            onClick={() => navigate(`/instances/${task.processInstanceId}`)}
+            style={{
+              background: 'rgba(0,0,0,0.05)',
+              border: 'none',
+              borderRadius: 12,
+              padding: '8px 14px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#3c3c43',
+              cursor: 'pointer',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            详情
+          </button>
+        </div>
       </div>
     )
   }
@@ -295,18 +359,57 @@ const MyTasksPage: React.FC = () => {
         </Space>
       }
     >
-      <Row gutter={16} style={{ marginBottom: 20 }}>
-        <Col xs={24} md={6}><Card size="small"><Statistic title="当前页任务" value={summary.total} /></Card></Col>
-        <Col xs={24} md={6}><Card size="small"><Statistic title="活跃任务" value={summary.active} /></Card></Col>
-        <Col xs={24} md={6}><Card size="small"><Statistic title="待审批" value={summary.waitingApproval} /></Card></Col>
-        <Col xs={24} md={6}><Card size="small"><Statistic title="已完成" value={summary.completed} /></Card></Col>
-      </Row>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 18,
+        marginBottom: 32,
+        padding: '0 2px',
+      }}>
+        {[
+          { title: '当前页任务', value: summary.total, color: '#4F8CFF', bg: 'linear-gradient(135deg, #fafdff 0%, #e3f0ff 100%)', shadow: '0 8px 32px #4f8cff22' },
+          { title: '活跃任务', value: summary.active, color: '#34C759', bg: 'linear-gradient(135deg, #fafdff 0%, #e6fff3 100%)', shadow: '0 8px 32px #34c75922' },
+          { title: '待审批', value: summary.waitingApproval, color: '#FFB800', bg: 'linear-gradient(135deg, #fffbe6 0%, #fff7e6 100%)', shadow: '0 8px 32px #ffb80022' },
+          { title: '已完成', value: summary.completed, color: '#5856D6', bg: 'linear-gradient(135deg, #f7f6fd 0%, #eae6ff 100%)', shadow: '0 8px 32px #5856d622' },
+        ].map((stat) => (
+          <div key={stat.title} style={{
+            background: stat.bg,
+            borderRadius: 22,
+            padding: '22px 24px',
+            border: 'none',
+            boxShadow: stat.shadow,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            position: 'relative',
+            overflow: 'hidden',
+            transition: 'box-shadow 0.2s',
+          }}>
+            <div style={{ fontSize: 13, color: stat.color, fontWeight: 700, marginBottom: 10, letterSpacing: '0.01em', opacity: 0.85 }}>
+              {stat.title}
+            </div>
+            <div style={{ fontSize: 38, fontWeight: 900, color: stat.color, lineHeight: 1.1, fontFeatureSettings: '"tnum"', textShadow: `0 2px 12px ${stat.color}22` }}>
+              {stat.value}
+            </div>
+            <div style={{
+              position: 'absolute',
+              right: -30,
+              bottom: -30,
+              width: 80,
+              height: 80,
+              background: stat.color,
+              opacity: 0.07,
+              borderRadius: '50%',
+              filter: 'blur(2px)',
+            }} />
+          </div>
+        ))}
+      </div>
 
       {viewMode === 'board' ? (
         data.length === 0 ? (
           <Empty description="当前筛选条件下暂无任务" />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: 16, alignItems: 'start' }}>
             {boardColumns.map((column) => {
               const items = laneBuckets[column.key]
               return (
@@ -325,24 +428,57 @@ const MyTasksPage: React.FC = () => {
                     }
                   }}
                   style={{
-                    background: '#fafafa',
-                    border: `1px solid ${column.accent}22`,
-                    borderTop: `4px solid ${column.accent}`,
-                    borderRadius: 20,
-                    padding: 14,
-                    minHeight: 240,
+                    background: 'rgba(242,242,247,0.72)',
+                    border: '1px solid rgba(0,0,0,0.07)',
+                    borderRadius: 24,
+                    padding: '16px 14px 20px',
+                    minHeight: 300,
+                    boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Space>
-                      <span style={{ color: column.accent }}>{column.icon}</span>
-                      <span style={{ fontWeight: 700 }}>{column.title}</span>
-                    </Space>
-                    <Tag color="default">{items.length}</Tag>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 6,
+                    padding: '0 4px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 10,
+                        background: `${column.accent}18`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: column.accent,
+                        fontSize: 16,
+                      }}>{column.icon}</div>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: '#1c1c1e', letterSpacing: '-0.01em' }}>{column.title}</span>
+                    </div>
+                    <span style={{
+                      background: column.accent,
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      padding: '2px 10px',
+                      borderRadius: 99,
+                      minWidth: 26,
+                      textAlign: 'center',
+                      display: 'inline-block',
+                      boxShadow: `0 2px 8px ${column.accent}44`,
+                    }}>{items.length}</span>
                   </div>
-                  <div style={{ color: 'rgba(0,0,0,0.45)', fontSize: 12, marginBottom: 12 }}>{column.description}</div>
+                  <div style={{ color: '#8e8e93', fontSize: 11, marginBottom: 14, paddingLeft: 4, letterSpacing: '0.01em' }}>
+                    {column.description}
+                  </div>
                   <div style={{ display: 'grid', gap: 12 }}>
-                    {items.length > 0 ? items.map(renderTaskCard) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无卡片" />}
+                    {items.length > 0
+                      ? items.map((task) => renderTaskCard(task, column.accent))
+                      : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无卡片" style={{ padding: '20px 0' }} />}
                   </div>
                 </div>
               )

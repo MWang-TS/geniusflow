@@ -5,7 +5,6 @@ import {
   NodeIndexOutlined,
   FileTextOutlined,
   CheckSquareOutlined,
-  BarChartOutlined,
   BookOutlined,
   AppstoreOutlined,
   SettingOutlined,
@@ -42,13 +41,12 @@ const MainLayout = () => {
 
   const workflowMenuItems = [
     { key: '/my-tasks', icon: <CheckSquareOutlined />, label: '任务看板' },
-    { key: '/processes', icon: <NodeIndexOutlined />, label: '流程管理' },
-    { key: '/instances', icon: <ProjectOutlined />, label: '流程实例' },
+    { key: '/processes', icon: <NodeIndexOutlined />, label: '流程设计' },
+    { key: '/instances', icon: <ProjectOutlined />, label: '流程看板' },
     { key: '/approvals', icon: <FileTextOutlined />, label: '审批中心' },
-    { key: '/progress', icon: <BarChartOutlined />, label: '进度监控' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库' },
     { key: '/notifications', icon: <BellOutlined />, label: '通知中心' },
-    { key: '/templates', icon: <AppstoreOutlined />, label: '模板市场' },
+    { key: '/templates', icon: <AppstoreOutlined />, label: '流程模版库' },
     {
       key: '/admin',
       icon: <SettingOutlined />,
@@ -64,14 +62,14 @@ const MainLayout = () => {
   const assistantMenuItems = [
     { key: '/skill-assistant', icon: <MessageOutlined />, label: '技能对话' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库管理' },
-    { key: '/templates', icon: <AppstoreOutlined />, label: '模板市场' },
+    { key: '/templates', icon: <AppstoreOutlined />, label: '流程模版库' },
     { key: '/admin/ai-settings', icon: <RobotOutlined />, label: 'AI 角色配置' },
   ]
 
   const apiPlatformMenuItems = [
     { key: '/api-platform', icon: <KeyOutlined />, label: 'API 密钥管理' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库管理' },
-    { key: '/templates', icon: <AppstoreOutlined />, label: '模板市场' },
+    { key: '/templates', icon: <AppstoreOutlined />, label: '流程模版库' },
     { key: '/admin/ai-settings', icon: <ApiOutlined />, label: 'AI 角色配置' },
   ]
 
@@ -104,7 +102,7 @@ const MainLayout = () => {
     if (path.startsWith('/approvals')) return '/approvals'
     if (path.startsWith('/knowledge-bases')) return '/knowledge-bases'
     if (path.startsWith('/notifications')) return '/notifications'
-    if (path.startsWith('/progress')) return '/progress'
+    if (path.startsWith('/progress')) return '/instances'
     if (path.startsWith('/templates')) return '/templates'
     if (path.startsWith('/skill-assistant')) return '/skill-assistant'
     if (path.startsWith('/api-platform')) return '/api-platform'
