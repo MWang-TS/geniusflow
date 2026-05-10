@@ -3,12 +3,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import json
 import asyncio
-from openai import AsyncOpenAI
 
-from app.core.config import settings
+from app.api.knowledge import build_chat_client
 
 router = APIRouter()
-client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 class Issue(BaseModel):
@@ -84,6 +82,8 @@ INSPECTOR_PROMPT_TEMPLATE = """你是一位严格的流程质量督导员。请�
 @router.post("/inspect", response_model=InspectorResult)
 async def inspect(request: InspectorRequest):
     try:
+        client, model_id = build_chat_client()
+
         prompt = INSPECTOR_PROMPT_TEMPLATE.format(
             node_name=request.nodeName,
             acceptance_criteria=request.acceptanceCriteria,
@@ -95,7 +95,7 @@ async def inspect(request: InspectorRequest):
 
         response = await asyncio.wait_for(
             client.chat.completions.create(
-                model=settings.OPENAI_MODEL,
+                model=model_id,
                 messages=[
                     {"role": "system", "content": "你是一个流程质量督导员，只输出合法的 JSON 格式。"},
                     {"role": "user", "content": prompt}

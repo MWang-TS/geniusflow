@@ -1,18 +1,12 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Form, Input, Button, Card, message, Typography, Segmented } from 'antd'
-import { UserOutlined, LockOutlined, NodeIndexOutlined, RobotOutlined, ApiOutlined } from '@ant-design/icons'
+import { Form, Input, Button, Card, message, Typography } from 'antd'
+import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth.store'
-import { usePlatformModeStore, PLATFORM_MODES, type PlatformMode } from '@/stores/platform-mode.store'
+import { usePlatformModeStore } from '@/stores/platform-mode.store'
 import { resolveHomeRoute } from '@/config/defaultRoutes'
 
 const { Title, Text } = Typography
-
-const MODE_ICONS: Record<PlatformMode, React.ReactNode> = {
-  workflow: <NodeIndexOutlined />,
-  assistant: <RobotOutlined />,
-  'api-platform': <ApiOutlined />,
-}
 
 interface LoginForm {
   email: string
@@ -22,7 +16,7 @@ interface LoginForm {
 const LoginPage = () => {
   const navigate = useNavigate()
   const { login, isAuthenticated, allowedRoutes } = useAuthStore()
-  const { mode, setMode } = usePlatformModeStore()
+  const { mode } = usePlatformModeStore()
   const [loading, setLoading] = useState(false)
   const homeRoute = resolveHomeRoute(mode, allowedRoutes)
 
@@ -56,19 +50,6 @@ const LoginPage = () => {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <Title level={3} style={{ margin: 0 }}>GeniusFlow</Title>
           <Text type="secondary">AI 驱动流程管理平台</Text>
-        </div>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ marginBottom: 8, color: 'rgba(0,0,0,0.45)', fontSize: 12 }}>选择使用模式</div>
-          <Segmented
-            value={mode}
-            onChange={(v) => setMode(v as PlatformMode)}
-            options={PLATFORM_MODES.map((m) => ({
-              value: m.key,
-              label: m.shortLabel,
-              icon: MODE_ICONS[m.key],
-            }))}
-            style={{ width: '100%' }}
-          />
         </div>
         <Form
           name="login"

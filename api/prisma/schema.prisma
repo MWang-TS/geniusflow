@@ -192,6 +192,7 @@ model KnowledgeBase {
   documents   KnowledgeBaseDocument[]
   wikiSources WikiRawSource[]
   wikiPages   WikiPage[]
+  wikiTriples WikiTriple[]
 
   @@map("knowledge_bases")
 }
@@ -266,6 +267,21 @@ model WikiPage {
 
   @@unique([knowledgeBaseId, slug])
   @@map("wiki_pages")
+}
+
+model WikiTriple {
+  id              String   @id @default(uuid())
+  knowledgeBaseId String   @map("knowledge_base_id")
+  subject         String
+  predicate       String
+  object          String
+  sourceSlug      String?  @map("source_slug")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId])
+  @@map("wiki_triples")
 }
 
 model SystemConfig {

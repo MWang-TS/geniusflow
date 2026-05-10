@@ -4,6 +4,11 @@ import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/transform.interceptor';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
+// Allow BigInt to be serialized as a number in JSON responses (e.g. Prisma BigInt fields)
+(BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function () {
+  return Number(this);
+};
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 

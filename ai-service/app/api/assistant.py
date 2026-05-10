@@ -3,12 +3,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import json
 import asyncio
-from openai import AsyncOpenAI
 
-from app.core.config import settings
+from app.api.knowledge import build_chat_client
 
 router = APIRouter()
-client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 class Risk(BaseModel):
@@ -93,6 +91,8 @@ ASSISTANT_PROMPT_TEMPLATE = """你是一位管理者的智能审批助理。请�
 @router.post("/assist", response_model=AssistantResult)
 async def assist(request: AssistantRequest):
     try:
+        client, model_id = build_chat_client()
+
         prompt = ASSISTANT_PROMPT_TEMPLATE.format(
             node_name=request.nodeName,
             input_data=json.dumps(request.inputData, ensure_ascii=False, indent=2),
@@ -104,7 +104,7 @@ async def assist(request: AssistantRequest):
 
         response = await asyncio.wait_for(
             client.chat.completions.create(
-                model=settings.OPENAI_MODEL,
+                model=model_id,
                 messages=[
                     {"role": "system", "content": "你是一个管理者的智能审批助理，只输出合法的 JSON 格式。"},
                     {"role": "user", "content": prompt}

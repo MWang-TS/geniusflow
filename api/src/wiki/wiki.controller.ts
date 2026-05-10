@@ -1,9 +1,9 @@
 import {
   Controller, Get, Post, Put, Delete,
-  Param, Body, UploadedFile, UseInterceptors,
+  Param, Body, UploadedFiles, UseInterceptors,
   UseGuards, Query,
 } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
+import { FilesInterceptor } from '@nestjs/platform-express'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/roles.guard'
 import { Roles } from '../auth/roles.decorator'
@@ -28,12 +28,15 @@ export class WikiController {
 
   @Post(':kbId/sources')
   @Roles('admin', 'designer')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FilesInterceptor('file'))
   async uploadSource(
     @Param('kbId') kbId: string,
-    @UploadedFile() file: { originalname: string; buffer: Buffer; size: number; mimetype: string },
+    @UploadedFiles() files: { originalname: string; buffer: Buffer; size: number; mimetype: string }[],
   ) {
-    return this.wikiService.uploadSource(kbId, file)
+    if (files.length <= 1) {
+      return this.wikiService.uploadSource(kbId, files[0])
+    }
+    return this.wikiService.uploadSources(kbId, files)
   }
 
   @Delete(':kbId/sources/:sourceId')
@@ -127,5 +130,23 @@ export class WikiController {
   @Get(':kbId/lint')
   async lintWiki(@Param('kbId') kbId: string) {
     return this.wikiService.lint(kbId)
+  }
+
+  // ----- Knowledge Graph -----
+
+  @Get(':kbId/graph')
+  async getGraph(@Param('kbId') kbId: string) {
+    return this.wikiService.getGraph(kbId)
+  }
+
+  @Get(':kbId/graph/build/status')
+  async getGraphBuildStatus(@Param('kbId') kbId: string) {
+    return this.wikiService.getGraphBuildStatus(kbId)
+  }
+
+  @Post(':kbId/graph/build')
+  @Roles('admin', 'designer')
+  async buildGraph(@Param('kbId') kbId: string) {
+    return this.wikiService.buildGraph(kbId)
   }
 }

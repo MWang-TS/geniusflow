@@ -5,6 +5,8 @@ import {
 import {
   SendOutlined, RobotOutlined, UserOutlined, ClearOutlined, LoadingOutlined,
 } from '@ant-design/icons'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { streamSkillChat, skillChatApi, type SkillChatMessage, type SkillChatChunk } from '@/api/skill-chat'
 
 const { Sider, Content } = Layout
@@ -133,7 +135,7 @@ export default function SkillAssistantPage() {
   }
 
   return (
-    <Layout style={{ height: 'calc(100vh - 112px)', background: 'transparent' }}>
+    <Layout style={{ height: 'calc(100vh - 160px)', background: 'transparent' }}>
       {/* Left panel: configuration */}
       <Sider
         width={260}
@@ -166,7 +168,7 @@ export default function SkillAssistantPage() {
           <div>
             <Text strong style={{ fontSize: 12, color: '#666' }}>知识库范围</Text>
             <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
-              不选则不使用知识库
+              不选则自动使用全部知识库
             </Text>
             {knowledgeBases.length === 0 ? (
               <Text type="secondary" style={{ fontSize: 12 }}>暂无可用知识库</Text>
@@ -207,7 +209,7 @@ export default function SkillAssistantPage() {
                 <Space direction="vertical" size={4}>
                   <Text>企业技能库 AI 助理</Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    选择知识库和AI角色，开始提问
+                    默认使用全部知识库，可选择 AI 角色或限定知识库范围
                   </Text>
                 </Space>
               }
@@ -240,7 +242,6 @@ export default function SkillAssistantPage() {
                     borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                     background: msg.role === 'user' ? '#1677ff' : '#f5f5f5',
                     color: msg.role === 'user' ? '#fff' : 'inherit',
-                    whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
                   }}
                 >
@@ -251,11 +252,16 @@ export default function SkillAssistantPage() {
                       <Spin indicator={<LoadingOutlined />} size="small" />
                       <Text style={{ fontSize: 13, color: '#666' }}>正在调用工具：<Tag color="blue">{msg.toolCalling}</Tag></Text>
                     </Space>
-                  ) : (
+                  ) : msg.role === 'user' ? (
                     <Paragraph style={{ margin: 0, color: 'inherit', whiteSpace: 'pre-wrap' }}>
                       {msg.content}
-                      {msg.pending && <span style={{ opacity: 0.5 }}>▊</span>}
                     </Paragraph>
+                  ) : (
+                    <div className="md-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.content + (msg.pending ? '▊' : '')}
+                      </ReactMarkdown>
+                    </div>
                   )}
                 </div>
                 {msg.role === 'user' && (

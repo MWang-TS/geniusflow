@@ -33,6 +33,31 @@ export interface WikiQueryResult {
   pages_used: string[]
 }
 
+export interface GraphNode {
+  id: string
+  label: string
+  type: string
+  size: number
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  label: string
+}
+
+export interface GraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  triple_count: number
+}
+
+export interface GraphBuildStatus {
+  status: 'idle' | 'queued' | 'building' | 'done' | 'error'
+  triple_count: number
+  message: string
+}
+
 export const wikiApi = {
   // Sources
   getSources: (kbId: string, params?: { page?: number; pageSize?: number }) =>
@@ -40,12 +65,11 @@ export const wikiApi = {
       `/wiki/${kbId}/sources`, { params }
     ),
 
-  uploadSource: (kbId: string, file: File) => {
+  uploadSource: (kbId: string, fileOrFiles: File | File[]) => {
     const form = new FormData()
-    form.append('file', file)
-    return client.post<WikiRawSource>(`/wiki/${kbId}/sources`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles]
+    files.forEach((file) => form.append('file', file))
+    return client.post<WikiRawSource | WikiRawSource[]>(`/wiki/${kbId}/sources`, form)
   },
 
   deleteSource: (kbId: string, sourceId: string) =>
@@ -67,7 +91,7 @@ export const wikiApi = {
     ),
 
   getPage: (kbId: string, slug: string) =>
-    client.get<WikiPage>(`/wiki/${kbId}/pages/${slug}`),
+    client.get<WikiPage>(`/wiki/${kbId}/pages/${encodeURIComponent(slug)}`),
 
   updatePage: (kbId: string, slug: string, data: { title?: string; content?: string; tags?: string[] }) =>
     client.put<WikiPage>(`/wiki/${kbId}/pages/${slug}`, data),
@@ -77,9 +101,19 @@ export const wikiApi = {
 
   // Query
   query: (kbId: string, question: string, maxPages?: number) =>
-    client.post<WikiQueryResult>(`/wiki/${kbId}/query`, { question, maxPages }),
+    client.post<WikiQueryResult>(`/wiki/${kbId}/query`, { question, maxPages }, { timeout: 120000 }),
 
   // Lint
   lint: (kbId: string) =>
     client.get<{ orphan_pages: string[]; broken_links: any[]; total_pages: number }>(`/wiki/${kbId}/lint`),
+
+  // Knowledge Graph
+  getGraph: (kbId: string) =>
+    client.get<GraphData>(`/wiki/${kbId}/graph`),
+
+  buildGraph: (kbId: string) =>
+    client.post<GraphBuildStatus>(`/wiki/${kbId}/graph/build`, {}),
+
+  getGraphBuildStatus: (kbId: string) =>
+    client.get<GraphBuildStatus>(`/wiki/${kbId}/graph/build/status`),
 }

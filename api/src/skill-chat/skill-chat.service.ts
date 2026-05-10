@@ -112,26 +112,44 @@ export class SkillChatService {
       return
     }
 
-    // 3. RAG: search knowledge bases for relevant context
+    // 3. Search knowledge bases for relevant context (auto-discover all when none specified)
     let knowledgeContext = ''
-    if (knowledgeBaseIds.length > 0) {
-      try {
-        const searchRes = await fetch(`${this.aiServiceUrl}/ai/search`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: message, knowledgeBaseIds, topK: 6 }),
-          signal: AbortSignal.timeout(10000),
-        })
-        if (searchRes.ok) {
-          const searchData = (await searchRes.json()) as { chunks: Array<{ content: string; score: number }> }
-          const relevantChunks = searchData.chunks.filter((c) => c.score > 0.3)
-          if (relevantChunks.length > 0) {
-            knowledgeContext = '\n\n## 相关知识库内容\n' + relevantChunks.map((c, i) => `[知识片段 ${i + 1}]\n${c.content}`).join('\n\n')
-          }
-        }
-      } catch {
-        // RAG failure is non-fatal
+    let ragKbIds: string[] = []
+    let wikiKbIds: string[] = []
+
+    if (knowledgeBaseIds.length === 0) {
+      // Auto-discover all enabled KBs
+      const allKbs = await this.prisma.knowledgeBase.findMany({ select: { id: true, mode: true } })
+      ragKbIds = allKbs.filter((kb) => kb.mode !== 'wiki').map((kb) => kb.id)
+      wikiKbIds = allKbs.filter((kb) => kb.mode === 'wiki').map((kb) => kb.id)
+    } else {
+      const kbs = await this.prisma.knowledgeBase.findMany({
+        where: { id: { in: knowledgeBaseIds } },
+        select: { id: true, mode: true },
+      })
+      ragKbIds = kbs.filter((kb) => kb.mode !== 'wiki').map((kb) => kb.id)
+      wikiKbIds = kbs.filter((kb) => kb.mode === 'wiki').map((kb) => kb.id)
+    }
+
+    const [ragChunks, ...wikiPageSets] = await Promise.all([
+      ragKbIds.length > 0 ? this.searchRagKbs(message, ragKbIds) : Promise.resolve([]),
+      ...wikiKbIds.map((id) => this.searchWikiKb(message, id)),
+    ])
+
+    const contextParts: string[] = []
+    if ((ragChunks as string[]).length > 0) {
+      contextParts.push((ragChunks as string[]).map((c, i) => `[知识片段 ${i + 1}]\n${c}`).join('\n\n'))
+    }
+    for (const pages of wikiPageSets as Array<Array<{ title: string; content: string }>>) {
+      if (pages.length > 0) {
+        contextParts.push(pages.map((p) => `## ${p.title}\n${p.content}`).join('\n\n---\n\n'))
       }
+    }
+    if (contextParts.length > 0) {
+      knowledgeContext =
+        '\n\n## 相关知识库内容\n' +
+        '> 以下内容来自系统知识库，请优先参考。若知识库内容与问题无关，请直接凭自身知识回答，无需强行引用。\n\n' +
+        contextParts.join('\n\n')
     }
 
     // 4. Build system prompt
@@ -378,6 +396,38 @@ export class SkillChatService {
 
     res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`)
     res.end()
+  }
+
+  private async searchRagKbs(query: string, kbIds: string[]): Promise<string[]> {
+    try {
+      const res = await fetch(`${this.aiServiceUrl}/ai/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, knowledgeBaseIds: kbIds, topK: 6 }),
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!res.ok) return []
+      const data = (await res.json()) as { chunks: Array<{ content: string; score: number }> }
+      return data.chunks.filter((c) => c.score > 0.3).map((c) => c.content)
+    } catch {
+      return []
+    }
+  }
+
+  private async searchWikiKb(query: string, kbId: string): Promise<Array<{ title: string; content: string }>> {
+    try {
+      const res = await fetch(`${this.aiServiceUrl}/wiki/pages-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kb_id: kbId, question: query, max_pages: 4, content_max_chars: 2000 }),
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = (await res.json()) as { pages: Array<{ title: string; slug: string; content: string }> }
+      return data.pages
+    } catch {
+      return []
+    }
   }
 
   private defaultBaseUrl(providerType: string): string {

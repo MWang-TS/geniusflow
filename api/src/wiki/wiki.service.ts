@@ -29,7 +29,8 @@ export class WikiService {
     private configService: ConfigService,
   ) {
     this.aiServiceUrl = this.configService.get<string>('AI_SERVICE_URL') || 'http://localhost:5000'
-    this.uploadDir = this.configService.get<string>('UPLOAD_DIR') || '/uploads'
+    const configuredUploadDir = this.configService.get<string>('UPLOAD_DIR')
+    this.uploadDir = configuredUploadDir ? path.resolve(configuredUploadDir) : path.resolve('uploads')
   }
 
   // -----------------------------------------------------------------------
@@ -54,15 +55,16 @@ export class WikiService {
     if (!file) throw new BadRequestException('No file provided')
     await this._ensureKb(kbId)
 
+    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8')
     const destDir = path.join(this.uploadDir, 'wiki', kbId)
     fs.mkdirSync(destDir, { recursive: true })
-    const destPath = path.join(destDir, `${Date.now()}_${file.originalname}`)
+    const destPath = path.join(destDir, `${Date.now()}_${originalName}`)
     fs.writeFileSync(destPath, file.buffer)
 
     const source = await this.prisma.wikiRawSource.create({
       data: {
         knowledgeBaseId: kbId,
-        fileName: file.originalname,
+        fileName: originalName,
         filePath: destPath,
         fileSize: BigInt(file.size),
         mimeType: file.mimetype,
@@ -71,6 +73,11 @@ export class WikiService {
       },
     })
     return source
+  }
+
+  async uploadSources(kbId: string, files: MulterFile[]) {
+    if (!files?.length) throw new BadRequestException('No files provided')
+    return Promise.all(files.map((file) => this.uploadSource(kbId, file)))
   }
 
   async deleteSource(kbId: string, sourceId: string) {
@@ -95,19 +102,31 @@ export class WikiService {
     })
 
     try {
-      // Get MinerU API key from system config
-      const mineruKey = await this._getMineruKey()
+      const isMarkdown = /\.(md|markdown)$/i.test(src.fileName)
 
-      const fileBytes = fs.readFileSync(src.filePath)
-      const b64 = fileBytes.toString('base64')
+      let markdown: string
+      let converter_mode: string
 
-      const respData = await postJson(`${this.aiServiceUrl}/wiki/convert`, {
-        file_bytes_b64: b64,
-        filename: src.fileName,
-        mineru_api_key: mineruKey,
-      }) as { markdown: string; converter_mode: string }
+      if (isMarkdown) {
+        // Markdown files don't need conversion — use content directly
+        markdown = fs.readFileSync(src.filePath, 'utf8')
+        converter_mode = 'passthrough'
+      } else {
+        // Get MinerU API key from system config
+        const mineruKey = await this._getMineruKey()
 
-      const { markdown, converter_mode } = respData
+        const fileBytes = fs.readFileSync(src.filePath)
+        const b64 = fileBytes.toString('base64')
+
+        const respData = await postJson(`${this.aiServiceUrl}/wiki/convert`, {
+          file_bytes_b64: b64,
+          filename: src.fileName,
+          mineru_api_key: mineruKey,
+        }) as { markdown: string; converter_mode: string }
+
+        markdown = respData.markdown
+        converter_mode = respData.converter_mode
+      }
 
       await this.prisma.wikiRawSource.update({
         where: { id: sourceId },
@@ -241,6 +260,31 @@ export class WikiService {
     return postJson(`${this.aiServiceUrl}/wiki/lint`, { kb_id: kbId })
   }
 
+  async buildGraph(kbId: string) {
+    await this._ensureKb(kbId)
+    return postJson(`${this.aiServiceUrl}/wiki/graph/build`, { kb_id: kbId })
+  }
+
+  async getGraphBuildStatus(kbId: string) {
+    await this._ensureKb(kbId)
+    const resp = await fetch(`${this.aiServiceUrl}/wiki/graph/build/status/${kbId}`)
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({} as Record<string, unknown>)) as Record<string, unknown>
+      throw new Error((err.detail as string) || `HTTP ${resp.status}`)
+    }
+    return resp.json()
+  }
+
+  async getGraph(kbId: string) {
+    await this._ensureKb(kbId)
+    const resp = await fetch(`${this.aiServiceUrl}/wiki/graph/${kbId}`)
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({} as Record<string, unknown>)) as Record<string, unknown>
+      throw new Error((err.detail as string) || `HTTP ${resp.status}`)
+    }
+    return resp.json()
+  }
+
   // -----------------------------------------------------------------------
   // Helpers
   // -----------------------------------------------------------------------
@@ -248,7 +292,7 @@ export class WikiService {
   private async _ensureKb(kbId: string) {
     const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: kbId } })
     if (!kb) throw new NotFoundException('Knowledge base not found')
-    if (kb.type !== 'wiki') throw new BadRequestException('Knowledge base is not of type wiki')
+    if (kb.mode !== 'wiki') throw new BadRequestException('Knowledge base is not of type wiki')
     return kb
   }
 

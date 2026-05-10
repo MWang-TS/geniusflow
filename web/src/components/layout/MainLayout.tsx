@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, theme, Dropdown, Avatar, Space, Typography, Tag } from 'antd'
+import { Layout, Menu, theme, Dropdown, Space, Typography } from 'antd'
 import {
   NodeIndexOutlined,
   FileTextOutlined,
@@ -18,7 +18,8 @@ import {
   KeyOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth.store'
-import { usePlatformModeStore, PLATFORM_MODES } from '@/stores/platform-mode.store'
+import { usePlatformModeStore } from '@/stores/platform-mode.store'
+import ModeSwitcher from './ModeSwitcher'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
@@ -62,7 +63,6 @@ const MainLayout = () => {
   const assistantMenuItems = [
     { key: '/skill-assistant', icon: <MessageOutlined />, label: '技能对话' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库管理' },
-    { key: '/templates', icon: <AppstoreOutlined />, label: '流程模版库' },
     { key: '/admin/ai-settings', icon: <RobotOutlined />, label: 'AI 角色配置' },
   ]
 
@@ -125,8 +125,6 @@ const MainLayout = () => {
     },
   ]
 
-  const currentModeInfo = PLATFORM_MODES.find((m) => m.key === mode)
-
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
@@ -163,18 +161,29 @@ const MainLayout = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <Tag
-            color={mode === 'workflow' ? 'blue' : mode === 'assistant' ? 'green' : 'purple'}
-            style={{ margin: 0, fontSize: 13 }}
-          >
-            {currentModeInfo?.label}
-          </Tag>
-          <Dropdown menu={{ items: userMenuItems }}>
-            <Space style={{ cursor: 'pointer' }}>
-              <Avatar size="small" icon={<UserOutlined />} />
-              <Text>{user?.name}</Text>
-            </Space>
-          </Dropdown>
+          <div />
+          <Space size={8}>
+            <ModeSwitcher />
+            <Dropdown menu={{ items: userMenuItems }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#1677ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontSize: 16,
+                  flexShrink: 0,
+                }}>
+                  <UserOutlined />
+                </div>
+                <Text>{user?.name}</Text>
+              </div>
+            </Dropdown>
+          </Space>
         </Header>
         <Content style={{ margin: '24px 16px', padding: 24, background: colorBgContainer, borderRadius: borderRadiusLG }}>
           <Outlet />

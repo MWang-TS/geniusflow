@@ -77,6 +77,36 @@ def build_embedding_client():
     return AsyncOpenAI(api_key=settings.OPENAI_API_KEY), settings.EMBEDDING_MODEL
 
 
+def build_chat_client():
+    """Return (AsyncOpenAI client, model_id) for the default chat model from DB."""
+    from openai import AsyncOpenAI
+    conn = psycopg2.connect(settings.DATABASE_URL)
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT m.model_id, p.api_key, p.base_url
+            FROM ai_models m
+            JOIN ai_providers p ON m.provider_id = p.id
+            WHERE m.type = 'chat'
+              AND m.is_default = true
+              AND m.is_enabled = true
+              AND p.is_enabled = true
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        raise RuntimeError("未配置默认 Chat 模型，请在系统管理 → AI 设置中设置默认模型")
+
+    client = AsyncOpenAI(
+        api_key=row["api_key"] or "sk-placeholder",
+        base_url=row.get("base_url") or None,
+    )
+    return client, row["model_id"]
+
+
 @router.post("/embed", response_model=EmbeddingResponse)
 async def embed(request: EmbeddingRequest):
     try:

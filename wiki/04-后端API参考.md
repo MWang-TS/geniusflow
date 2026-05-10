@@ -309,9 +309,83 @@ POST /open-api/keys
 
 ---
 
-## 十五、AI 报告 `/ai-reports`
+## 十五、Wiki 知识库 `/wiki`
+
+Wiki 模式知识库的全部接口。Wiki 知识库在创建时 `mode` 字段为 `wiki`。
+
+### 原始文件管理
 
 | 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/wiki/:kbId/sources` | 原始文件列表（分页） | 已登录 |
+| POST | `/wiki/:kbId/sources` | 上传原始文件（multipart/form-data，支持多文件） | admin / designer |
+| DELETE | `/wiki/:kbId/sources/:sourceId` | 删除原始文件 | admin |
+| POST | `/wiki/:kbId/sources/:sourceId/convert` | 将原始文件转换为 Markdown | admin / designer |
+| POST | `/wiki/:kbId/sources/:sourceId/ingest` | 将已转换的 Markdown 拆分为 Wiki 页面入库 | admin / designer |
+| POST | `/wiki/:kbId/sources/:sourceId/process` | convert + ingest 一步完成 | admin / designer |
+
+### Wiki 页面管理
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/wiki/:kbId/pages` | Wiki 页面列表（分页，可按 pageType 筛选） | 已登录 |
+| GET | `/wiki/:kbId/pages/:slug` | 获取单个页面 | 已登录 |
+| PUT | `/wiki/:kbId/pages/:slug` | 更新页面内容/标签 | admin / designer |
+| DELETE | `/wiki/:kbId/pages/:slug` | 删除页面 | admin |
+
+### AI 智能问答
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| POST | `/wiki/:kbId/query` | 基于关键词排名检索 + LLM 生成回答 | 已登录 |
+
+**请求格式**
+```json
+POST /wiki/:kbId/query
+{
+  "question": "什么是项目管理办公室",
+  "maxPages": 8
+}
+```
+
+**响应格式**
+```json
+{
+  "answer": "项目管理办公室（PMO）是...",
+  "pagesUsed": ["pmbok-5", "12xiang-mu-guan-li-yuan-ze"]
+}
+```
+
+### 知识图谱
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/wiki/:kbId/graph` | 获取知识图谱数据（节点+边） | 已登录 |
+| GET | `/wiki/:kbId/graph/build/status` | 查询图谱构建状态 | 已登录 |
+| POST | `/wiki/:kbId/graph/build` | 触发图谱构建（异步，从 Wiki 页面提取三元组） | admin / designer |
+
+**图谱数据响应**
+```json
+{
+  "nodes": [
+    { "id": "项目管理", "label": "项目管理", "type": "entity", "size": 8 }
+  ],
+  "edges": [
+    { "source": "项目管理", "target": "PMO", "label": "包含" }
+  ],
+  "tripleCount": 141
+}
+```
+
+### Wiki 检查
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/wiki/:kbId/lint` | 检查孤立页面和断链 | 已登录 |
+
+---
+
+## 十六、AI 报告 `/ai-reports`
 |------|------|------|------|
 | GET | `/ai-reports` | 报告列表 | 已登录 |
 | GET | `/ai-reports/:id` | 报告详情 | 已登录 |
@@ -346,7 +420,7 @@ POST /open-api/keys
 
 ---
 
-## 十九、错误码说明
+## 二十、错误码说明
 
 | HTTP 状态码 | 含义 |
 |------------|------|
