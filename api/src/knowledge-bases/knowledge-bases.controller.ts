@@ -75,6 +75,15 @@ export class KnowledgeBasesController {
     return this.service.uploadDocument(id, file)
   }
 
+  @Post(':id/documents/text')
+  @Roles('admin')
+  uploadDocumentText(
+    @Param('id') id: string,
+    @Body() body: { title: string; content: string },
+  ) {
+    return this.service.uploadDocumentText(id, body.title, body.content)
+  }
+
   @Post(':id/documents/:docId/reindex')
   @Roles('admin')
   retryVectorize(

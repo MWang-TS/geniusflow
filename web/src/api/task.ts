@@ -8,6 +8,8 @@ export interface TaskListItem {
   processStatus: string
   nodeName: string
   type: string
+  title: string | null
+  taskCode: string | null
   status: string
   nodeStatus: string
   percentComplete: number

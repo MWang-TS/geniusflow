@@ -16,6 +16,7 @@ import {
   ApiOutlined,
   MessageOutlined,
   KeyOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth.store'
 import { usePlatformModeStore } from '@/stores/platform-mode.store'
@@ -43,6 +44,7 @@ const MainLayout = () => {
   const workflowMenuItems = [
     { key: '/my-tasks', icon: <CheckSquareOutlined />, label: '任务看板' },
     { key: '/processes', icon: <NodeIndexOutlined />, label: '流程设计' },
+    { key: '/sop-generator', icon: <ThunderboltOutlined />, label: 'AI 生成 SOP' },
     { key: '/instances', icon: <ProjectOutlined />, label: '流程看板' },
     { key: '/approvals', icon: <FileTextOutlined />, label: '审批中心' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库' },

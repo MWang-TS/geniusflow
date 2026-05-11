@@ -18,6 +18,7 @@ import {
   DeleteOutlined,
   SendOutlined,
   ReloadOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { processDefinitionApi } from '../../api/process-definition'
@@ -184,7 +185,7 @@ const ProcessListPage: React.FC = () => {
 
   return (
     <Card
-      title="流程定义"
+      title="SOP流程库"
       extra={
         <Space>
           <Input.Search
@@ -211,8 +212,11 @@ const ProcessListPage: React.FC = () => {
             ]}
           />
           <Button icon={<ReloadOutlined />} onClick={() => fetchData(pagination.page, pagination.pageSize)} />
+          <Button icon={<ThunderboltOutlined />} onClick={() => navigate('/sop-generator')}>
+            AI 生成 SOP
+          </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新建流程
+            新建SOP流程
           </Button>
         </Space>
       }

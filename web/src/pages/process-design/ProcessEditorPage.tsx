@@ -9,6 +9,8 @@ import {
   Typography,
   Spin,
   Alert,
+  Switch,
+  Tooltip,
 } from 'antd'
 import {
   SaveOutlined,
@@ -16,6 +18,7 @@ import {
   ArrowLeftOutlined,
   ExclamationCircleOutlined,
   CheckCircleOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import ProcessCanvas from '../../components/process/ProcessCanvas'
 import NodeLibrary from '../../components/process/NodeLibrary'
@@ -40,6 +43,7 @@ const ProcessEditorPage: React.FC = () => {
     saveDraft,
     publish,
     updateName,
+    updateProcessSettings,
   } = useProcessDesignStore()
 
   const [isNew, setIsNew] = useState(false)
@@ -192,6 +196,7 @@ const ProcessEditorPage: React.FC = () => {
   }
 
   const isPublished = currentProcess.status === 'published'
+  const aiEnabled = currentProcess.graphJson?.processSettings?.aiConfig?.enabled !== false
 
   return (
     <Layout style={{ height: '100vh', background: '#f5f5f5' }}>
@@ -238,6 +243,21 @@ const ProcessEditorPage: React.FC = () => {
           )}
         </Space>
         <Space>
+          <Tooltip title={isPublished ? '已发布流程不可修改' : 'AI 助手对所有节点统一生效，员工执行时可随时提问获取操作指引'}>
+            <Space size={6} style={{ cursor: isPublished ? 'not-allowed' : 'default', padding: '0 8px', borderRadius: 6, border: '1px solid #f0f0f0', height: 32, lineHeight: '30px', background: '#fafafa' }}>
+              <RobotOutlined style={{ color: aiEnabled ? '#1677ff' : '#bfbfbf' }} />
+              <span style={{ fontSize: 13, color: aiEnabled ? '#1677ff' : '#8c8c8c' }}>AI 助手</span>
+              <Switch
+                size="small"
+                checked={aiEnabled}
+                disabled={isPublished}
+                onChange={async (v) => {
+                  const settings = currentProcess?.graphJson?.processSettings ?? {}
+                  await updateProcessSettings({ ...settings, aiConfig: { ...(settings.aiConfig ?? {}), enabled: v } })
+                }}
+              />
+            </Space>
+          </Tooltip>
           {!isPublished && (
             <Button icon={<SaveOutlined />} loading={isSaving} onClick={handleSave}>
               保存草稿

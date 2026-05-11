@@ -68,13 +68,15 @@ model ProcessDefinition {
   category    String?
   isTemplate  Boolean  @default(false) @map("is_template")
   isPreset    Boolean  @default(false) @map("is_preset")
+  sopCode     String?  @unique @map("sop_code")
   createdBy   String?  @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  creator         User?               @relation(fields: [createdBy], references: [id])
-  nodes           NodeDefinition[]
+  creator          User?               @relation(fields: [createdBy], references: [id])
+  nodes            NodeDefinition[]
   processInstances ProcessInstance[]
+  taskDefs         TaskDefinition[]
 
   @@unique([name, version])
   @@map("process_definitions")
@@ -96,6 +98,7 @@ model NodeDefinition {
 
   process       ProcessDefinition @relation(fields: [processId], references: [id], onDelete: Cascade)
   nodeInstances NodeInstance[]
+  taskDefs      TaskDefinition[]
 
   @@map("node_definitions")
 }
@@ -167,16 +170,39 @@ model Task {
   nodeInstanceId String    @map("node_instance_id")
   assigneeUserId String    @map("assignee_user_id")
   type           String
+  title          String?
+  taskCode       String?   @map("task_code")
+  taskDefId      String?   @map("task_def_id")
   status         String    @default("pending")
   dueDate        DateTime? @map("due_date")
   completedAt    DateTime? @map("completed_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  nodeInstance NodeInstance @relation(fields: [nodeInstanceId], references: [id], onDelete: Cascade)
-  assignee     User         @relation(fields: [assigneeUserId], references: [id])
+  nodeInstance NodeInstance    @relation(fields: [nodeInstanceId], references: [id], onDelete: Cascade)
+  assignee     User            @relation(fields: [assigneeUserId], references: [id])
+  taskDef      TaskDefinition? @relation(fields: [taskDefId], references: [id])
 
   @@map("tasks")
+}
+
+model TaskDefinition {
+  id           String   @id @default(uuid())
+  processDefId String   @map("process_def_id")
+  nodeDefId    String   @map("node_def_id")
+  title        String
+  description  String?
+  taskType     String   @default("checklist") @map("task_type")
+  isRequired   Boolean  @default(true) @map("is_required")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  processDef ProcessDefinition @relation(fields: [processDefId], references: [id], onDelete: Cascade)
+  nodeDef    NodeDefinition    @relation(fields: [nodeDefId], references: [id], onDelete: Cascade)
+  tasks      Task[]
+
+  @@map("task_definitions")
 }
 
 model KnowledgeBase {

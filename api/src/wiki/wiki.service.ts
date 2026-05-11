@@ -80,6 +80,35 @@ export class WikiService {
     return Promise.all(files.map((file) => this.uploadSource(kbId, file)))
   }
 
+  async uploadSourceText(kbId: string, title: string, content: string) {
+    if (!title?.trim()) throw new BadRequestException('标题不能为空')
+    if (!content?.trim()) throw new BadRequestException('内容不能为空')
+    await this._ensureKb(kbId)
+
+    const safeTitle = title.replace(/[/\\?%*:|"<>]/g, '_').trim()
+    const fileName = `${safeTitle}.md`
+    const destDir = path.join(this.uploadDir, 'wiki', kbId)
+    fs.mkdirSync(destDir, { recursive: true })
+    const destPath = path.join(destDir, `${Date.now()}_${fileName}`)
+    const fileBuffer = Buffer.from(content, 'utf8')
+    fs.writeFileSync(destPath, fileBuffer)
+
+    const source = await this.prisma.wikiRawSource.create({
+      data: {
+        knowledgeBaseId: kbId,
+        fileName,
+        filePath: destPath,
+        fileSize: BigInt(fileBuffer.length),
+        mimeType: 'text/markdown',
+        conversionStatus: 'done',
+        markdownContent: content,
+        converterMode: 'passthrough',
+        ingestStatus: 'pending',
+      },
+    })
+    return source
+  }
+
   async deleteSource(kbId: string, sourceId: string) {
     const src = await this.prisma.wikiRawSource.findFirst({
       where: { id: sourceId, knowledgeBaseId: kbId },

@@ -24,12 +24,17 @@ export class ProcessDefinitionsService {
       throw new ConflictException('已存在同名的草稿流程')
     }
 
+    // 自动生成 SOP 编号 (SOP-001, SOP-002, ...)
+    const count = await this.prisma.processDefinition.count()
+    const sopCode = `SOP-${String(count + 1).padStart(3, '0')}`
+
     const definition = await this.prisma.processDefinition.create({
       data: {
         name,
         graphJson: graphJson as any,
         status: 'draft',
         version: 1,
+        sopCode,
         createdBy: userId,
       },
     })

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Card, Tabs, Table, Button, Space, Tag, App, Tooltip, Upload,
-  Typography, Input, Drawer, Spin, Alert, Badge, Empty,
+  Typography, Input, Drawer, Spin, Alert, Badge, Empty, Modal, Form,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   ArrowLeftOutlined, UploadOutlined, PlayCircleOutlined, DeleteOutlined,
   ReloadOutlined, FileTextOutlined, ReadOutlined, SearchOutlined, ShareAltOutlined,
+  FormOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { wikiApi, type WikiRawSource, type WikiPage, type GraphData, type GraphNode, type GraphBuildStatus } from '../../api/wiki'
@@ -73,6 +74,11 @@ export default function WikiKbDetailPage() {
   const [selectedGraphNode, setSelectedGraphNode] = useState<GraphNode | null>(null)
   const [graphNodeDrawerOpen, setGraphNodeDrawerOpen] = useState(false)
 
+  // Text input modal
+  const [textModalOpen, setTextModalOpen] = useState(false)
+  const [textSubmitting, setTextSubmitting] = useState(false)
+  const [textForm] = Form.useForm<{ title: string; content: string }>()
+
   // Query
   const [queryOpen, setQueryOpen] = useState(false)
   const [question, setQuestion] = useState('')
@@ -123,6 +129,24 @@ export default function WikiKbDetailPage() {
   useEffect(() => {
     if (activeTab === 'pages') fetchPages()
   }, [activeTab])
+
+  const handleTextSubmit = async () => {
+    if (!kbId) return
+    try {
+      const values = await textForm.validateFields()
+      setTextSubmitting(true)
+      await wikiApi.uploadSourceText(kbId, values.title, values.content)
+      message.success('文本已添加，可点击「处理」解析为 Wiki 页面')
+      textForm.resetFields()
+      setTextModalOpen(false)
+      fetchSources()
+    } catch (err: any) {
+      if (err?.errorFields) return // form validation error
+      message.error(err?.response?.data?.message || '提交失败')
+    } finally {
+      setTextSubmitting(false)
+    }
+  }
 
   const handleUpload = async (files: File[]) => {
     if (!kbId) return false
@@ -448,7 +472,7 @@ export default function WikiKbDetailPage() {
               label: <span><UploadOutlined /> 原始文档</span>,
               children: (
                 <div>
-                  <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <Upload
                       multiple
                       showUploadList={false}
@@ -463,6 +487,7 @@ export default function WikiKbDetailPage() {
                     >
                       <Button icon={<UploadOutlined />} type="primary">上传文档</Button>
                     </Upload>
+                    <Button icon={<FormOutlined />} onClick={() => { textForm.resetFields(); setTextModalOpen(true) }}>输入文本</Button>
                     <Button icon={<ReloadOutlined />} onClick={() => fetchSources()}>刷新</Button>
                     <Button
                       icon={<PlayCircleOutlined />}
@@ -751,6 +776,40 @@ export default function WikiKbDetailPage() {
           </div>
         )}
       </Drawer>
+
+      {/* Text Input Modal */}
+      <Modal
+        open={textModalOpen}
+        title="输入文本内容"
+        okText="提交"
+        cancelText="取消"
+        confirmLoading={textSubmitting}
+        onOk={handleTextSubmit}
+        onCancel={() => { setTextModalOpen(false); textForm.resetFields() }}
+        width={720}
+        destroyOnClose
+      >
+        <Form form={textForm} layout="vertical" style={{ marginTop: 8 }}>
+          <Form.Item
+            name="title"
+            label="标题"
+            rules={[{ required: true, message: '请输入标题' }]}
+          >
+            <Input placeholder="文档标题（将作为文件名保存）" maxLength={100} />
+          </Form.Item>
+          <Form.Item
+            name="content"
+            label="内容（支持 Markdown 格式）"
+            rules={[{ required: true, message: '请输入内容' }]}
+          >
+            <Input.TextArea
+              rows={16}
+              placeholder="在此粘贴或输入文本内容，支持 Markdown 格式…"
+              style={{ fontFamily: 'monospace', fontSize: 13 }}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   )
 }

@@ -11,9 +11,18 @@ export interface GraphEdge {
   target: string
 }
 
+export interface ProcessSettings {
+  aiConfig?: {
+    enabled?: boolean
+    knowledgeBaseIds?: string[]
+    promptTemplate?: string
+  }
+}
+
 export interface GraphJson {
   nodes: GraphNode[]
   edges: GraphEdge[]
+  processSettings?: ProcessSettings
 }
 
 export interface ProcessDefinition {
@@ -68,9 +77,17 @@ export interface InputField {
   options?: string[]
 }
 
+export interface ChecklistItem {
+  id: string
+  label: string
+  required: boolean
+}
+
 export interface ActionSpec {
-  instructions?: string
+  sopContent?: string         // 操作规范说明（主字段）
+  instructions?: string       // 向后兼容别名
   requirements?: string
+  checklist?: ChecklistItem[] // 执行检查清单
   aiAssistance?: string[]
   timeConstraint?: { estimatedDays?: number }
 }
@@ -87,7 +104,8 @@ export interface AiConfig {
     enabled?: boolean
     mode?: 'strict' | 'normal' | 'loose'
     promptTemplate?: string
-    knowledgeBaseId?: string
+    knowledgeBaseId?: string    // 向后兼容，单选时保留
+    knowledgeBaseIds?: string[] // 多选，优先使用
   }
   assistant?: {
     enabled?: boolean

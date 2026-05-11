@@ -6,8 +6,8 @@ import type { ColumnsType } from 'antd/es/table'
 import { taskApi, type TaskListItem } from '../../api/task'
 
 const typeMap: Record<string, { color: string; label: string }> = {
-  execute: { color: 'blue', label: '执行' },
-  approve: { color: 'orange', label: '审批' },
+  execute: { color: 'blue', label: 'SOP执行' },
+  approve: { color: 'orange', label: '审批确认' },
 }
 
 const statusMap: Record<string, { color: string; label: string }> = {
@@ -30,12 +30,12 @@ type BoardViewMode = 'board' | 'list'
 type BoardLaneKey = 'pending' | 'in_progress' | 'ai_inspecting' | 'pending_approval' | 'completed' | 'cancelled'
 
 const boardColumns: Array<{ key: BoardLaneKey; title: string; accent: string; icon: React.ReactNode; description: string }> = [
-  { key: 'pending', title: '待开始', accent: '#8c8c8c', icon: <ClockCircleOutlined />, description: '已分配但尚未开始的流程任务' },
-  { key: 'in_progress', title: '处理中', accent: '#1677ff', icon: <SyncOutlined />, description: '正在执行或审阅中的任务' },
-  { key: 'ai_inspecting', title: 'AI质检', accent: '#722ed1', icon: <SyncOutlined spin />, description: '提交后正在经过 AI 督导校验' },
-  { key: 'pending_approval', title: '待审批', accent: '#fa8c16', icon: <ApartmentOutlined />, description: '等待主管审批放行' },
-  { key: 'completed', title: '已完成', accent: '#389e0d', icon: <CheckCircleOutlined />, description: '流程节点已闭环' },
-  { key: 'cancelled', title: '已取消', accent: '#bfbfbf', icon: <ClockCircleOutlined />, description: '已取消或终止的任务' },
+  { key: 'pending', title: '待执行', accent: '#8c8c8c', icon: <ClockCircleOutlined />, description: '已分配但尚未开始的SOP步骤' },
+  { key: 'in_progress', title: '执行中', accent: '#1677ff', icon: <SyncOutlined />, description: '正在按SOP规范操作中' },
+  { key: 'ai_inspecting', title: 'AI质检', accent: '#722ed1', icon: <SyncOutlined spin />, description: '提交后AI正在校验操作合规性' },
+  { key: 'pending_approval', title: '待确认', accent: '#fa8c16', icon: <ApartmentOutlined />, description: '等待主管确认完成' },
+  { key: 'completed', title: '已完成', accent: '#389e0d', icon: <CheckCircleOutlined />, description: 'SOP步骤已执行完毕' },
+  { key: 'cancelled', title: '已取消', accent: '#bfbfbf', icon: <ClockCircleOutlined />, description: '已取消或终止的步骤' },
 ]
 
 function getBoardLane(task: TaskListItem): BoardLaneKey {
@@ -130,20 +130,38 @@ const MyTasksPage: React.FC = () => {
 
   const columns: ColumnsType<TaskListItem> = [
     {
+      title: '任务编号',
+      dataIndex: 'taskCode',
+      key: 'taskCode',
+      width: 150,
+      render: (v: string | null) =>
+        v ? (
+          <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#1677ff', background: '#e6f4ff', padding: '2px 6px', borderRadius: 4 }}>
+            {v}
+          </span>
+        ) : '-',
+    },
+    {
       title: '流程名称',
       dataIndex: 'processName',
       key: 'processName',
       ellipsis: true,
     },
     {
-      title: '节点名称',
+      title: '节点',
       dataIndex: 'nodeName',
       key: 'nodeName',
-      width: 160,
+      width: 130,
       ellipsis: true,
     },
     {
-      title: '任务类型',
+      title: '任务名称',
+      key: 'taskTitle',
+      ellipsis: true,
+      render: (_, record) => record.title ?? <span style={{ color: '#bfbfbf' }}>-</span>,
+    },
+    {
+      title: '类型',
       dataIndex: 'type',
       key: 'type',
       width: 80,
@@ -245,9 +263,32 @@ const MyTasksPage: React.FC = () => {
             {task.processName}
           </span>
         </div>
-        <div style={{ fontWeight: 700, fontSize: 15, color: '#1c1c1e', marginBottom: 12, lineHeight: 1.4, letterSpacing: '-0.015em' }}>
-          {task.nodeName}
+        {/* taskCode badge */}
+        {task.taskCode && (
+          <div style={{ marginBottom: 6 }}>
+            <span style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: laneAccent,
+              background: `${laneAccent}15`,
+              padding: '2px 7px',
+              borderRadius: 6,
+              letterSpacing: '0.04em',
+              fontFamily: 'monospace',
+            }}>
+              {task.taskCode}
+            </span>
+          </div>
+        )}
+        <div style={{ fontWeight: 700, fontSize: 15, color: '#1c1c1e', marginBottom: 4, lineHeight: 1.4, letterSpacing: '-0.015em' }}>
+          {task.title ?? task.nodeName}
         </div>
+        {task.title && (
+          <div style={{ fontSize: 11, color: '#8e8e93', marginBottom: 12 }}>
+            {task.nodeName}
+          </div>
+        )}
+        {!task.title && <div style={{ marginBottom: 12 }} />}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
           {[typeMap[task.type]?.label || task.type, taskStatus.label, nodeStatus.label].map((label) => (
             <span key={label} style={{

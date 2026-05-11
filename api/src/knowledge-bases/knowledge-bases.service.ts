@@ -152,6 +152,38 @@ export class KnowledgeBasesService {
     return { ...doc, fileSize: Number(doc.fileSize) }
   }
 
+  async uploadDocumentText(kbId: string, title: string, content: string) {
+    await this.findOne(kbId)
+    if (!title?.trim()) throw new NotFoundException('标题不能为空')
+    if (!content?.trim()) throw new NotFoundException('内容不能为空')
+
+    const safeTitle = title.replace(/[/\\?%*:|"<>]/g, '_').trim()
+    const fileName = `${safeTitle}.md`
+    const uploadDir = path.resolve('uploads', 'knowledge', kbId)
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+    const filePath = path.join(uploadDir, `${Date.now()}_${fileName}`)
+    const fileBuffer = Buffer.from(content, 'utf8')
+    fs.writeFileSync(filePath, fileBuffer)
+
+    const doc = await this.prisma.knowledgeBaseDocument.create({
+      data: {
+        knowledgeBaseId: kbId,
+        fileName,
+        filePath,
+        fileSize: fileBuffer.length,
+        mimeType: 'text/markdown',
+        parseStatus: 'pending',
+        vectorizedStatus: 'pending',
+      },
+    })
+
+    this.processDocument(doc.id, filePath, fileName).catch(() => {})
+
+    return { ...doc, fileSize: Number(doc.fileSize) }
+  }
+
   async deleteDocument(kbId: string, docId: string) {
     const doc = await this.prisma.knowledgeBaseDocument.findFirst({
       where: { id: docId, knowledgeBaseId: kbId },

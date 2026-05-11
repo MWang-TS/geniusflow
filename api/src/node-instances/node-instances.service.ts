@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { QueueService } from '../queue/queue.service'
 import { WsGateway } from '../ws/ws.gateway'
+import { TaskDefinitionsService } from '../task-definitions/task-definitions.service'
 import { SaveNodeInstanceDto, SubmitNodeInstanceDto, UpdateProgressDto } from './dto/node-instance.dto'
 
 type AuthUser = {
@@ -19,6 +20,7 @@ export class NodeInstancesService {
     private prisma: PrismaService,
     private queueService: QueueService,
     private wsGateway: WsGateway,
+    private taskDefinitionsService: TaskDefinitionsService,
   ) {}
 
   async findOne(id: string, user: AuthUser) {
@@ -93,7 +95,7 @@ export class NodeInstancesService {
     await this.prisma.nodeInstance.update({ where: { id }, data })
 
     const progressConfig = node.definition.progressConfig as Record<string, unknown> | null
-    const needApproval = progressConfig?.needApproval !== false
+    const needApproval = progressConfig?.needApproval === true
 
     if (needApproval) {
       const inputSpec = node.definition.inputSpec as Record<string, unknown> | null
@@ -210,6 +212,13 @@ export class NodeInstancesService {
               dueDate: plannedEnd || undefined,
             },
           })
+          // 从任务定义生成子任务
+          await this.taskDefinitionsService.spawnSubTasksForNodeInstance(
+            nextNodeInstance.id,
+            nextDef.id,
+            nextNodeInstance.assigneeUserId,
+            nextNodeInstance.plannedEndDate,
+          )
         }
         await this.prisma.nodeInstanceHistory.create({
           data: {

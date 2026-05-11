@@ -91,7 +91,7 @@ const ProcessInstanceListPage: React.FC = () => {
 
   const columns: ColumnsType<ProcessInstanceListItem> = [
     {
-      title: '流程名称',
+      title: 'SOP流程名称',
       dataIndex: 'definitionName',
       key: 'definitionName',
       ellipsis: true,

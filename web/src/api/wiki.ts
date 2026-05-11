@@ -72,6 +72,9 @@ export const wikiApi = {
     return client.post<WikiRawSource | WikiRawSource[]>(`/wiki/${kbId}/sources`, form)
   },
 
+  uploadSourceText: (kbId: string, title: string, content: string) =>
+    client.post<WikiRawSource>(`/wiki/${kbId}/sources/text`, { title, content }),
+
   deleteSource: (kbId: string, sourceId: string) =>
     client.delete(`/wiki/${kbId}/sources/${sourceId}`),
 

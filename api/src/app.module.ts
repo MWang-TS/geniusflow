@@ -24,6 +24,8 @@ import { AiAssistantModule } from './ai-assistant/ai-assistant.module'
 import { SkillChatModule } from './skill-chat/skill-chat.module'
 import { OpenApiModule } from './open-api/open-api.module'
 import { WikiModule } from './wiki/wiki.module'
+import { SopGeneratorModule } from './sop-generator/sop-generator.module'
+import { TaskDefinitionsModule } from './task-definitions/task-definitions.module'
 
 @Module({
   imports: [
@@ -53,6 +55,8 @@ import { WikiModule } from './wiki/wiki.module'
     SkillChatModule,
     OpenApiModule,
     WikiModule,
+    SopGeneratorModule,
+    TaskDefinitionsModule,
   ],
 })
 export class AppModule {}

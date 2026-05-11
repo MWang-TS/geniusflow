@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ProcessDefinition, GraphJson, NodeDefinition } from '../types/process'
+import type { ProcessDefinition, GraphJson, NodeDefinition, ProcessSettings } from '../types/process'
 import { processDefinitionApi } from '../api/process-definition'
 import { nodeDefinitionApi } from '../api/node-definition'
 
@@ -24,6 +24,7 @@ interface ProcessDesignState {
   updateGraph: (graphJson: GraphJson) => void
   addNode: (nodeId: string, nodeType: 'start' | 'task' | 'end', label: string, graphJson: GraphJson) => void
   updateNodeData: (nodeId: string, data: Record<string, unknown>) => Promise<void>
+  updateProcessSettings: (settings: ProcessSettings) => Promise<void>
 
   validate: () => ValidationResult
 }
@@ -161,6 +162,21 @@ export const useProcessDesignStore = create<ProcessDesignState>((set, get) => ({
       })
     } catch {
       throw new Error('更新节点配置失败')
+    }
+  },
+
+  updateProcessSettings: async (settings: ProcessSettings) => {
+    const { currentProcess } = get()
+    if (!currentProcess) return
+    const newGraphJson = { ...currentProcess.graphJson, processSettings: settings }
+    set({ currentProcess: { ...currentProcess, graphJson: newGraphJson } })
+    try {
+      await processDefinitionApi.update(currentProcess.id, {
+        name: currentProcess.name,
+        graphJson: newGraphJson,
+      })
+    } catch {
+      throw new Error('保存流程AI设置失败')
     }
   },
 

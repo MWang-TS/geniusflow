@@ -17,7 +17,9 @@ export class UpdateNodeDefinitionDto {
   @IsOptional()
   @IsObject()
   actionSpec?: {
+    sopContent?: string
     instructions?: string
+    checklist?: Array<{ id: string; label: string; required: boolean }>
     requirements?: string
     aiAssistance?: string[]
     timeConstraint?: { estimatedDays?: number }
@@ -40,6 +42,7 @@ export class UpdateNodeDefinitionDto {
       mode?: string
       promptTemplate?: string
       knowledgeBaseId?: string
+      knowledgeBaseIds?: string[]
     }
     assistant?: {
       enabled?: boolean

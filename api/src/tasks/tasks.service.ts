@@ -57,6 +57,8 @@ export class TasksService {
         processStatus: t.nodeInstance.instance.status,
         nodeName: t.nodeInstance.definition.nodeName,
         type: t.type,
+        title: t.title ?? null,
+        taskCode: t.taskCode ?? null,
         status: t.status,
         nodeStatus: t.nodeInstance.status,
         percentComplete: t.nodeInstance.percentComplete,

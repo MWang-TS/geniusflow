@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
+import { TaskDefinitionsService } from '../task-definitions/task-definitions.service'
 import { CreateProcessInstanceDto } from './dto/create-process-instance.dto'
 
 type AuthUser = {
@@ -17,6 +18,7 @@ export class ProcessInstancesService {
   constructor(
     private prisma: PrismaService,
     private auditLog: AuditLogService,
+    private taskDefinitionsService: TaskDefinitionsService,
   ) {}
 
   async create(dto: CreateProcessInstanceDto, user: AuthUser) {
@@ -128,6 +130,13 @@ export class ProcessInstancesService {
           dueDate: plannedEnd || undefined,
         },
       })
+      // 从任务定义生成子任务
+      await this.taskDefinitionsService.spawnSubTasksForNodeInstance(
+        firstNode.id,
+        firstNode.definition.id,
+        firstNode.assigneeUserId,
+        firstNode.plannedEndDate,
+      )
     }
 
     const result = await this.findOne(instance.id, user)

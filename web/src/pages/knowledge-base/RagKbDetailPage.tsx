@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Card, Tabs, Table, Button, Space, Tag, App, Tooltip, Typography,
-  Upload, Form, InputNumber, Slider, Divider, Spin, Badge,
+  Upload, Form, InputNumber, Slider, Divider, Spin, Badge, Modal, Input,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadProps } from 'antd'
 import {
   ArrowLeftOutlined, RedoOutlined, DeleteOutlined,
-  SaveOutlined, InboxOutlined,
+  SaveOutlined, InboxOutlined, FormOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { knowledgeBaseApi, type KnowledgeBaseItem, type KnowledgeBaseDocument, type RagSettings } from '../../api/knowledge-base'
@@ -46,6 +46,9 @@ export default function RagKbDetailPage() {
   const [uploading, setUploading] = useState(false)
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsForm] = Form.useForm<RagSettings>()
+  const [textModalOpen, setTextModalOpen] = useState(false)
+  const [textSubmitting, setTextSubmitting] = useState(false)
+  const [textForm] = Form.useForm<{ title: string; content: string }>()
 
   const fetchKb = useCallback(async () => {
     if (!kbId) return
@@ -99,6 +102,24 @@ export default function RagKbDetailPage() {
       setUploading(false)
     }
     return false // prevent ant design auto-upload
+  }
+
+  const handleTextSubmit = async () => {
+    if (!kbId) return
+    try {
+      const values = await textForm.validateFields()
+      setTextSubmitting(true)
+      await knowledgeBaseApi.uploadDocumentText(kbId, values.title, values.content)
+      message.success('文本已添加，正在处理中')
+      textForm.resetFields()
+      setTextModalOpen(false)
+      fetchDocs(1, pagination.pageSize)
+    } catch (err: any) {
+      if (err?.errorFields) return
+      message.error(err?.response?.data?.message || '提交失败')
+    } finally {
+      setTextSubmitting(false)
+    }
   }
 
   const handleReindex = async (docId: string) => {
@@ -229,6 +250,14 @@ export default function RagKbDetailPage() {
                     </p>
                     {uploading && <p style={{ color: '#1677ff' }}>上传中...</p>}
                   </Dragger>
+                  <div style={{ marginTop: 12, textAlign: 'center' }}>
+                    <Button
+                      icon={<FormOutlined />}
+                      onClick={() => { textForm.resetFields(); setTextModalOpen(true) }}
+                    >
+                      直接输入文本 / 粘贴 Markdown
+                    </Button>
+                  </div>
                 </Card>
 
                 {/* Document table */}
@@ -328,6 +357,40 @@ export default function RagKbDetailPage() {
           },
         ]}
       />
+
+      {/* Text Input Modal */}
+      <Modal
+        open={textModalOpen}
+        title="输入文本内容"
+        okText="提交"
+        cancelText="取消"
+        confirmLoading={textSubmitting}
+        onOk={handleTextSubmit}
+        onCancel={() => { setTextModalOpen(false); textForm.resetFields() }}
+        width={720}
+        destroyOnClose
+      >
+        <Form form={textForm} layout="vertical" style={{ marginTop: 8 }}>
+          <Form.Item
+            name="title"
+            label="标题"
+            rules={[{ required: true, message: '请输入标题' }]}
+          >
+            <Input placeholder="文档标题（将作为文件名保存）" maxLength={100} />
+          </Form.Item>
+          <Form.Item
+            name="content"
+            label="内容（支持 Markdown 格式）"
+            rules={[{ required: true, message: '请输入内容' }]}
+          >
+            <Input.TextArea
+              rows={16}
+              placeholder="在此粘贴或输入文本内容，支持 Markdown 格式…"
+              style={{ fontFamily: 'monospace', fontSize: 13 }}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

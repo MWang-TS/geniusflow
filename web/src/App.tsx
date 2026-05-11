@@ -24,6 +24,7 @@ import RoleManagementPage from './pages/admin/RoleManagementPage'
 import AiSettingsPage from './pages/admin/ai-settings/AiSettingsPage'
 import SkillAssistantPage from './pages/skill-assistant/SkillAssistantPage'
 import ApiPlatformPage from './pages/api-platform/ApiPlatformPage'
+import SopGeneratorPage from './pages/sop-generator/SopGeneratorPage'
 import AiAssistant from './components/common/AiAssistant'
 import { useAuthStore } from './stores/auth.store'
 import { usePlatformModeStore } from './stores/platform-mode.store'
@@ -72,6 +73,14 @@ function App() {
             <Route path="progress/:id" element={<ProgressDetailPage />} />
             <Route path="notifications" element={<NotificationListPage />} />
             <Route path="templates" element={<TemplateMarketPage />} />
+            <Route
+              path="sop-generator"
+              element={
+                <RouteGuard roles={['designer', 'admin']}>
+                  <SopGeneratorPage />
+                </RouteGuard>
+              }
+            />
             {/* ── Shared (Knowledge Base) ── */}
             <Route path="knowledge-bases" element={<KnowledgeBaseListPage />} />
             <Route path="knowledge-bases/:kbId/wiki" element={<WikiKbDetailPage />} />

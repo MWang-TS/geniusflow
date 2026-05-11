@@ -39,6 +39,15 @@ export class WikiController {
     return this.wikiService.uploadSources(kbId, files)
   }
 
+  @Post(':kbId/sources/text')
+  @Roles('admin', 'designer')
+  async uploadSourceText(
+    @Param('kbId') kbId: string,
+    @Body() body: { title: string; content: string },
+  ) {
+    return this.wikiService.uploadSourceText(kbId, body.title, body.content)
+  }
+
   @Delete(':kbId/sources/:sourceId')
   @Roles('admin')
   async deleteSource(

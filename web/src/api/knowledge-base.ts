@@ -64,6 +64,9 @@ export const knowledgeBaseApi = {
     return client.post(`/knowledge-bases/${id}/documents`, form)
   },
 
+  uploadDocumentText: (id: string, title: string, content: string) =>
+    client.post(`/knowledge-bases/${id}/documents/text`, { title, content }),
+
   deleteDocument: (id: string, docId: string) =>
     client.delete(`/knowledge-bases/${id}/documents/${docId}`),
 
