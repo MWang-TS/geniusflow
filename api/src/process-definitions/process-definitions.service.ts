@@ -132,6 +132,16 @@ export class ProcessDefinitionsService {
       throw new ConflictException('已发布的流程不能删除，请先停止')
     }
 
+    // 检查是否存在关联的流程实例
+    const instanceCount = await this.prisma.processInstance.count({
+      where: { definitionId: id },
+    })
+    if (instanceCount > 0) {
+      throw new ConflictException(
+        `该流程已有 ${instanceCount} 条运行记录，无法删除。如需清理，请联系管理员。`,
+      )
+    }
+
     await this.prisma.processDefinition.delete({ where: { id } })
     return { success: true }
   }

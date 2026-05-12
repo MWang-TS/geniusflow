@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Table, Button, Space, Tag, Select, App, Tooltip, Segmented, Empty } from 'antd'
-import { ReloadOutlined, PlayCircleOutlined, ApartmentOutlined, CheckCircleOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons'
+import { ReloadOutlined, PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { taskApi, type TaskListItem } from '../../api/task'
 
@@ -27,13 +27,11 @@ const nodeStatusMap: Record<string, { color: string; label: string }> = {
 }
 
 type BoardViewMode = 'board' | 'list'
-type BoardLaneKey = 'pending' | 'in_progress' | 'ai_inspecting' | 'pending_approval' | 'completed' | 'cancelled'
+type BoardLaneKey = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 
 const boardColumns: Array<{ key: BoardLaneKey; title: string; accent: string; icon: React.ReactNode; description: string }> = [
   { key: 'pending', title: '待执行', accent: '#8c8c8c', icon: <ClockCircleOutlined />, description: '已分配但尚未开始的SOP步骤' },
   { key: 'in_progress', title: '执行中', accent: '#1677ff', icon: <SyncOutlined />, description: '正在按SOP规范操作中' },
-  { key: 'ai_inspecting', title: 'AI质检', accent: '#722ed1', icon: <SyncOutlined spin />, description: '提交后AI正在校验操作合规性' },
-  { key: 'pending_approval', title: '待确认', accent: '#fa8c16', icon: <ApartmentOutlined />, description: '等待主管确认完成' },
   { key: 'completed', title: '已完成', accent: '#389e0d', icon: <CheckCircleOutlined />, description: 'SOP步骤已执行完毕' },
   { key: 'cancelled', title: '已取消', accent: '#bfbfbf', icon: <ClockCircleOutlined />, description: '已取消或终止的步骤' },
 ]
@@ -41,9 +39,7 @@ const boardColumns: Array<{ key: BoardLaneKey; title: string; accent: string; ic
 function getBoardLane(task: TaskListItem): BoardLaneKey {
   if (task.status === 'completed') return 'completed'
   if (task.status === 'cancelled') return 'cancelled'
-  if (task.nodeStatus === 'pending_approval') return 'pending_approval'
-  if (task.nodeStatus === 'ai_inspecting') return 'ai_inspecting'
-  if (task.status === 'in_progress') return 'in_progress'
+  if (['in_progress', 'ai_inspecting', 'pending_approval'].includes(task.nodeStatus ?? '') || task.status === 'in_progress') return 'in_progress'
   return 'pending'
 }
 
@@ -89,8 +85,6 @@ const MyTasksPage: React.FC = () => {
     }, {
       pending: [],
       in_progress: [],
-      ai_inspecting: [],
-      pending_approval: [],
       completed: [],
       cancelled: [],
     })
@@ -98,8 +92,8 @@ const MyTasksPage: React.FC = () => {
 
   const summary = useMemo(() => ({
     total: data.length,
-    active: data.filter((item) => ['pending', 'in_progress', 'ai_inspecting', 'pending_approval'].includes(getBoardLane(item))).length,
-    waitingApproval: laneBuckets.pending_approval.length,
+    active: data.filter((item) => ['pending', 'in_progress'].includes(getBoardLane(item))).length,
+    waitingApproval: 0,
     completed: laneBuckets.completed.length,
   }), [data, laneBuckets])
 
