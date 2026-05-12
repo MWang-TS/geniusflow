@@ -54,4 +54,16 @@ export class ProcessDefinitionsController {
   publish(@Param('id') id: string, @Req() req: any) {
     return this.service.publish(id, req.user.userId)
   }
+
+  @Post(':id/stop')
+  @Roles('designer', 'admin')
+  stop(@Param('id') id: string, @Req() req: any) {
+    return this.service.stop(id, req.user.userId)
+  }
+
+  @Post(':id/reopen')
+  @Roles('designer', 'admin')
+  reopen(@Param('id') id: string, @Req() req: any) {
+    return this.service.reopen(id, req.user.userId)
+  }
 }

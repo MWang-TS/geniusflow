@@ -61,4 +61,14 @@ export const processDefinitionApi = {
     client.post<any, { code: number; data: { id: string; version: number; status: string }; message: string }>(
       `/process-definitions/${id}/publish`,
     ),
+
+  stop: (id: string) =>
+    client.post<any, { code: number; data: { id: string; status: string }; message: string }>(
+      `/process-definitions/${id}/stop`,
+    ),
+
+  reopen: (id: string) =>
+    client.post<any, { code: number; data: { id: string; status: string }; message: string }>(
+      `/process-definitions/${id}/reopen`,
+    ),
 }

@@ -19,6 +19,8 @@ import {
   SendOutlined,
   ReloadOutlined,
   ThunderboltOutlined,
+  StopOutlined,
+  RedoOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { processDefinitionApi } from '../../api/process-definition'
@@ -27,6 +29,7 @@ import type { ProcessDefinitionListItem } from '../../types/process'
 const statusMap: Record<string, { color: string; label: string }> = {
   draft: { color: 'orange', label: '草稿' },
   published: { color: 'green', label: '已发布' },
+  stopped: { color: 'red', label: '已停止' },
   archived: { color: 'default', label: '已归档' },
 }
 
@@ -97,6 +100,26 @@ const ProcessListPage: React.FC = () => {
     }
   }
 
+  const handleStop = async (id: string) => {
+    try {
+      await processDefinitionApi.stop(id)
+      message.success('流程已停止')
+      fetchData(pagination.page, pagination.pageSize)
+    } catch {
+      message.error('停止失败')
+    }
+  }
+
+  const handleReopen = async (id: string) => {
+    try {
+      await processDefinitionApi.reopen(id)
+      message.success('已恢复为草稿，可重新编辑')
+      fetchData(pagination.page, pagination.pageSize)
+    } catch {
+      message.error('恢复失败')
+    }
+  }
+
   const columns: ColumnsType<ProcessDefinitionListItem> = [
     {
       title: '流程名称',
@@ -146,7 +169,7 @@ const ProcessListPage: React.FC = () => {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record.id)}
-              disabled={record.status === 'published'}
+              disabled={record.status !== 'draft'}
             />
           </Tooltip>
           {record.status === 'draft' && (
@@ -159,7 +182,36 @@ const ProcessListPage: React.FC = () => {
               />
             </Tooltip>
           )}
-          {record.status === 'draft' && (
+          {record.status === 'published' && (
+            <Popconfirm
+              title="确认停止该流程？"
+              description="停止后新例子不能再使用此流程，可恢复编辑或删除"
+              onConfirm={() => handleStop(record.id)}
+              okText="停止"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+            >
+              <Tooltip title="停止">
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<StopOutlined />}
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
+          {record.status === 'stopped' && (
+            <Tooltip title="恢复编辑">
+              <Button
+                type="link"
+                size="small"
+                icon={<RedoOutlined />}
+                onClick={() => handleReopen(record.id)}
+              />
+            </Tooltip>
+          )}
+          {(record.status === 'draft' || record.status === 'stopped') && (
             <Popconfirm
               title="确认删除？"
               description="删除后不可恢复"
@@ -208,6 +260,7 @@ const ProcessListPage: React.FC = () => {
             options={[
               { label: '草稿', value: 'draft' },
               { label: '已发布', value: 'published' },
+              { label: '已停止', value: 'stopped' },
               { label: '已归档', value: 'archived' },
             ]}
           />

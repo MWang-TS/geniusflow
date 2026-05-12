@@ -105,7 +105,7 @@ export class ProcessDefinitionsService {
   async update(id: string, dto: UpdateProcessDefinitionDto) {
     const definition = await this.findOne(id)
 
-    if (definition.status !== 'draft') {
+    if (!['draft'].includes(definition.status)) {
       throw new ConflictException('只有草稿状态的流程可以编辑')
     }
 
@@ -129,11 +129,57 @@ export class ProcessDefinitionsService {
     const definition = await this.findOne(id)
 
     if (definition.status === 'published') {
-      throw new ConflictException('已发布的流程不能删除，请先归档')
+      throw new ConflictException('已发布的流程不能删除，请先停止')
     }
 
     await this.prisma.processDefinition.delete({ where: { id } })
     return { success: true }
+  }
+
+  async stop(id: string, userId: string) {
+    const definition = await this.findOne(id)
+
+    if (definition.status !== 'published') {
+      throw new ConflictException('只有已发布的流程才能停止')
+    }
+
+    await this.prisma.processDefinition.update({
+      where: { id },
+      data: { status: 'stopped' },
+    })
+
+    await this.auditLog.record({
+      userId,
+      action: 'stop_process',
+      resourceType: 'process_definition',
+      resourceId: id,
+      details: { name: definition.name },
+    })
+
+    return { id, status: 'stopped' }
+  }
+
+  async reopen(id: string, userId: string) {
+    const definition = await this.findOne(id)
+
+    if (definition.status !== 'stopped') {
+      throw new ConflictException('只有已停止的流程才能恢复编辑')
+    }
+
+    await this.prisma.processDefinition.update({
+      where: { id },
+      data: { status: 'draft' },
+    })
+
+    await this.auditLog.record({
+      userId,
+      action: 'reopen_process',
+      resourceType: 'process_definition',
+      resourceId: id,
+      details: { name: definition.name },
+    })
+
+    return { id, status: 'draft' }
   }
 
   async publish(id: string, userId: string) {

@@ -29,7 +29,7 @@ export interface ProcessDefinition {
   id: string
   name: string
   version: number
-  status: 'draft' | 'published' | 'archived'
+  status: 'draft' | 'published' | 'stopped' | 'archived'
   graphJson: GraphJson
   nodes: NodeDefinition[]
   createdBy: string | null
@@ -41,7 +41,7 @@ export interface ProcessDefinitionListItem {
   id: string
   name: string
   version: number
-  status: 'draft' | 'published' | 'archived'
+  status: 'draft' | 'published' | 'stopped' | 'archived'
   nodeCount: number
   createdBy: string | null
   createdAt: string
