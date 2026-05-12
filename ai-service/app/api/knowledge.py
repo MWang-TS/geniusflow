@@ -4,11 +4,26 @@ from typing import List, Optional
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from psycopg2.extras import RealDictCursor
+import socket
+import httpx
 
 from app.core.config import settings
 from app.services.document_parser import parse_file_bytes, parse_file_path, chunk_text
 
 router = APIRouter()
+
+
+def _ipv4_http_client(**kwargs) -> httpx.AsyncClient:
+    """返回强制 IPv4 的 httpx.AsyncClient，避免 Docker 容器 IPv6 不通导致连接失败。"""
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+    return httpx.AsyncClient(transport=transport, **kwargs)
+
+
+def _make_openai_client(api_key: str, base_url=None):
+    """创建强制 IPv4 的 AsyncOpenAI 客户端。"""
+    from openai import AsyncOpenAI
+    http_client = _ipv4_http_client(timeout=httpx.Timeout(120.0))
+    return AsyncOpenAI(api_key=api_key, base_url=base_url or None, http_client=http_client)
 
 
 class EmbeddingRequest(BaseModel):
@@ -65,21 +80,19 @@ def get_default_embedding_model():
 
 def build_embedding_client():
     """Return (AsyncOpenAI client, model_id) using DB config or env fallback."""
-    from openai import AsyncOpenAI
     db_model = get_default_embedding_model()
     if db_model and db_model.get("api_key"):
-        client = AsyncOpenAI(
+        client = _make_openai_client(
             api_key=db_model["api_key"],
-            base_url=db_model.get("base_url") or None,
+            base_url=db_model.get("base_url"),
         )
         return client, db_model["model_id"]
     # Fallback to env vars
-    return AsyncOpenAI(api_key=settings.OPENAI_API_KEY), settings.EMBEDDING_MODEL
+    return _make_openai_client(api_key=settings.OPENAI_API_KEY), settings.EMBEDDING_MODEL
 
 
 def build_chat_client():
     """Return (AsyncOpenAI client, model_id) for the default chat model from DB."""
-    from openai import AsyncOpenAI
     conn = psycopg2.connect(settings.DATABASE_URL)
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -100,9 +113,9 @@ def build_chat_client():
     if not row:
         raise RuntimeError("未配置默认 Chat 模型，请在系统管理 → AI 设置中设置默认模型")
 
-    client = AsyncOpenAI(
+    client = _make_openai_client(
         api_key=row["api_key"] or "sk-placeholder",
-        base_url=row.get("base_url") or None,
+        base_url=row.get("base_url"),
     )
     return client, row["model_id"]
 

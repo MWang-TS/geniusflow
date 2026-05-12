@@ -23,10 +23,7 @@ export class TasksService {
   async findAll(query: { type?: string; status?: string; page: number; pageSize: number }, user: AuthUser) {
     const { type, status, page, pageSize } = query
 
-    const where: Record<string, unknown> = {}
-    if (!this.hasOversightAccess(user)) {
-      where.assigneeUserId = user.userId
-    }
+    const where: Record<string, unknown> = await this.buildTaskVisibilityWhere(user)
     if (type) where.type = type
     if (status) where.status = status
 
@@ -37,6 +34,7 @@ export class TasksService {
         take: pageSize,
         orderBy: { createdAt: 'desc' },
         include: {
+          assignee: { select: { id: true, name: true } },
           nodeInstance: {
             include: {
               definition: { select: { id: true, nodeName: true, nodeType: true } },
@@ -64,6 +62,8 @@ export class TasksService {
         percentComplete: t.nodeInstance.percentComplete,
         dueDate: t.dueDate,
         createdAt: t.createdAt,
+        assigneeUserId: t.assigneeUserId,
+        assigneeName: t.assignee?.name ?? null,
         actionPath:
           t.type === 'approve'
             ? `/approvals/${t.id}`
@@ -246,6 +246,52 @@ export class TasksService {
     })
 
     return { status: 'in_progress', message: '已驳回，等待员工修改后重新提交' }
+  }
+
+  private getRoleLevel(role: string): number {
+    const levels: Record<string, number> = {
+      employee: 0,
+      manager: 1,
+      ceo: 2,
+      admin: 3,
+    }
+    return levels[role] ?? 0
+  }
+
+  private getUserMaxLevel(roles: string[]): number {
+    return roles.length > 0 ? Math.max(...roles.map((r) => this.getRoleLevel(r))) : 0
+  }
+
+  /**
+   * 构建任务可见范围 where 条件：
+   * - admin (level 3): 可看所有人的任务
+   * - ceo (level 2): 可看 ceo / manager / employee 的任务
+   * - manager (level 1): 可看 manager / employee 的任务
+   * - employee (level 0): 只能看自己的任务
+   */
+  private async buildTaskVisibilityWhere(user: AuthUser): Promise<Record<string, unknown>> {
+    const userRoles = user.roles ?? []
+    const userMaxLevel = this.getUserMaxLevel(userRoles)
+
+    // admin 看全部
+    if (userMaxLevel >= 3) return {}
+
+    // employee 只看自己
+    if (userMaxLevel === 0) return { assigneeUserId: user.userId }
+
+    // 找出所有最高角色级别 ≤ 当前用户级别的用户
+    const allUsers = await this.prisma.user.findMany({
+      include: { userRoles: { include: { role: true } } },
+    })
+
+    const visibleUserIds = allUsers
+      .filter((u) => {
+        const roles = u.userRoles.map((ur) => ur.role.name)
+        return this.getUserMaxLevel(roles) <= userMaxLevel
+      })
+      .map((u) => u.id)
+
+    return { assigneeUserId: { in: visibleUserIds } }
   }
 
   private hasOversightAccess(user: AuthUser) {

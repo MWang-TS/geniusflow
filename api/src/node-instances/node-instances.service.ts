@@ -183,43 +183,46 @@ export class NodeInstancesService {
       (n) => n.id === nodeInstance.definitionId,
     )
 
-    if (currentIndex >= 0 && currentIndex < definitionNodes.length - 1) {
-      const nextDef = definitionNodes[currentIndex + 1]
+    // 循环跳过无执行人的节点（开始/结束等），直到找到有执行人的节点或到达末尾
+    let nextIndex = currentIndex + 1
+    while (nextIndex < definitionNodes.length) {
+      const nextDef = definitionNodes[nextIndex]
       const nextNodeInstance = await this.prisma.nodeInstance.findFirst({
         where: { instanceId, definitionId: nextDef.id },
       })
-      if (nextNodeInstance) {
-        await this.prisma.nodeInstance.update({
-          where: { id: nextNodeInstance.id },
+      if (!nextNodeInstance) break
+
+      await this.prisma.nodeInstance.update({
+        where: { id: nextNodeInstance.id },
+        data: {
+          status: 'in_progress',
+          actualStartDate: new Date(),
+          plannedStartDate: new Date(),
+        },
+      })
+      await this.prisma.processInstance.update({
+        where: { id: instanceId },
+        data: { currentNodeId: nextNodeInstance.id },
+      })
+
+      if (nextNodeInstance.assigneeUserId) {
+        // 有执行人：创建任务后停止，等待执行人操作
+        const plannedEnd = nextNodeInstance.plannedEndDate
+        await this.prisma.task.create({
           data: {
-            status: 'in_progress',
-            actualStartDate: new Date(),
-            plannedStartDate: new Date(),
+            nodeInstanceId: nextNodeInstance.id,
+            assigneeUserId: nextNodeInstance.assigneeUserId,
+            type: 'execute',
+            status: 'pending',
+            dueDate: plannedEnd || undefined,
           },
         })
-        await this.prisma.processInstance.update({
-          where: { id: instanceId },
-          data: { currentNodeId: nextNodeInstance.id },
-        })
-        if (nextNodeInstance.assigneeUserId) {
-          const plannedEnd = nextNodeInstance.plannedEndDate
-          await this.prisma.task.create({
-            data: {
-              nodeInstanceId: nextNodeInstance.id,
-              assigneeUserId: nextNodeInstance.assigneeUserId,
-              type: 'execute',
-              status: 'pending',
-              dueDate: plannedEnd || undefined,
-            },
-          })
-          // 从任务定义生成子任务
-          await this.taskDefinitionsService.spawnSubTasksForNodeInstance(
-            nextNodeInstance.id,
-            nextDef.id,
-            nextNodeInstance.assigneeUserId,
-            nextNodeInstance.plannedEndDate,
-          )
-        }
+        await this.taskDefinitionsService.spawnSubTasksForNodeInstance(
+          nextNodeInstance.id,
+          nextDef.id,
+          nextNodeInstance.assigneeUserId,
+          nextNodeInstance.plannedEndDate,
+        )
         await this.prisma.nodeInstanceHistory.create({
           data: {
             nodeInstanceId: nextNodeInstance.id,
@@ -227,13 +230,29 @@ export class NodeInstancesService {
             toStatus: 'in_progress',
           },
         })
+        return  // 等待执行人，停止自动推进
+      } else {
+        // 无执行人：自动完成该节点，继续向后推进
+        await this.prisma.nodeInstance.update({
+          where: { id: nextNodeInstance.id },
+          data: { status: 'completed', actualEndDate: new Date() },
+        })
+        await this.prisma.nodeInstanceHistory.create({
+          data: {
+            nodeInstanceId: nextNodeInstance.id,
+            eventType: 'auto_complete',
+            toStatus: 'completed',
+          },
+        })
+        nextIndex++
       }
-    } else {
-      await this.prisma.processInstance.update({
-        where: { id: instanceId },
-        data: { status: 'completed' },
-      })
     }
+
+    // 所有节点都已处理完毕，流程结束
+    await this.prisma.processInstance.update({
+      where: { id: instanceId },
+      data: { status: 'completed' },
+    })
   }
 
   private hasOversightAccess(user: AuthUser) {

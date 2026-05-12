@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Table, Button, Space, Tag, Select, App, Tooltip, Segmented, Empty } from 'antd'
-import { ReloadOutlined, PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Tag, Select, App, Tooltip, Segmented, Empty, Avatar } from 'antd'
+import { ReloadOutlined, PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, SyncOutlined, EyeOutlined, UserOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { taskApi, type TaskListItem } from '../../api/task'
+import { useAuthStore } from '../../stores/auth.store'
 
 const typeMap: Record<string, { color: string; label: string }> = {
   execute: { color: 'blue', label: 'SOP执行' },
@@ -37,8 +38,8 @@ const boardColumns: Array<{ key: BoardLaneKey; title: string; accent: string; ic
 ]
 
 function getBoardLane(task: TaskListItem): BoardLaneKey {
-  if (task.status === 'completed') return 'completed'
-  if (task.status === 'cancelled') return 'cancelled'
+  if (task.status === 'completed' || task.nodeStatus === 'completed') return 'completed'
+  if (task.status === 'cancelled' || task.nodeStatus === 'cancelled') return 'cancelled'
   if (['in_progress', 'ai_inspecting', 'pending_approval'].includes(task.nodeStatus ?? '') || task.status === 'in_progress') return 'in_progress'
   return 'pending'
 }
@@ -51,11 +52,13 @@ function canMoveBetweenLanes(task: TaskListItem, targetLane: BoardLaneKey) {
 const MyTasksPage: React.FC = () => {
   const navigate = useNavigate()
   const { message } = App.useApp()
+  const currentUser = useAuthStore((s) => s.user)
   const [data, setData] = useState<TaskListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0 })
   const [filterType, setFilterType] = useState<string | undefined>()
   const [filterStatus, setFilterStatus] = useState<string | undefined>()
+  const [filterAssignee, setFilterAssignee] = useState<string | undefined>()
   const [viewMode, setViewMode] = useState<BoardViewMode>('board')
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
@@ -78,8 +81,21 @@ const MyTasksPage: React.FC = () => {
 
   useEffect(() => { fetchData(1, pagination.pageSize) }, [filterType, filterStatus])
 
+  // 所有执行人去重列表（用于筛选器）
+  const assigneeOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    data.forEach((t) => { if (t.assigneeUserId && t.assigneeName) seen.set(t.assigneeUserId, t.assigneeName) })
+    return Array.from(seen.entries()).map(([id, name]) => ({ label: name, value: id }))
+  }, [data])
+
+  // 前端执行人筛选
+  const filteredData = useMemo(() => {
+    if (!filterAssignee) return data
+    return data.filter((t) => t.assigneeUserId === filterAssignee)
+  }, [data, filterAssignee])
+
   const laneBuckets = useMemo(() => {
-    return data.reduce<Record<BoardLaneKey, TaskListItem[]>>((acc, item) => {
+    return filteredData.reduce<Record<BoardLaneKey, TaskListItem[]>>((acc, item) => {
       acc[getBoardLane(item)].push(item)
       return acc
     }, {
@@ -88,14 +104,14 @@ const MyTasksPage: React.FC = () => {
       completed: [],
       cancelled: [],
     })
-  }, [data])
+  }, [filteredData])
 
   const summary = useMemo(() => ({
-    total: data.length,
-    active: data.filter((item) => ['pending', 'in_progress'].includes(getBoardLane(item))).length,
-    waitingApproval: 0,
+    pending: laneBuckets.pending.length,
+    in_progress: laneBuckets.in_progress.length,
     completed: laneBuckets.completed.length,
-  }), [data, laneBuckets])
+    cancelled: laneBuckets.cancelled.length,
+  }), [laneBuckets])
 
   const handleTaskStatusDrop = useCallback(async (taskId: string, targetLane: BoardLaneKey) => {
     const task = data.find((item) => item.id === taskId)
@@ -199,21 +215,45 @@ const MyTasksPage: React.FC = () => {
       render: (v: string) => new Date(v).toLocaleString('zh-CN'),
     },
     {
+      title: '执行人',
+      key: 'assignee',
+      width: 90,
+      render: (_, record) => (
+        <Space size={4}>
+          <Avatar size={20} icon={<UserOutlined />} style={{ background: record.assigneeUserId === currentUser?.id ? '#1677ff' : '#8c8c8c', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: record.assigneeUserId === currentUser?.id ? '#1677ff' : '#595959' }}>
+            {record.assigneeName ?? '-'}
+          </span>
+        </Space>
+      ),
+    },
+    {
       title: '操作',
       key: 'actions',
       width: 100,
-      render: (_, record) => (
-        <Space size="small">
-          {record.status !== 'cancelled' && (
-            <Tooltip title={record.type === 'approve' ? '去审批' : '去执行'}>
-              <Button type="primary" size="small" icon={<PlayCircleOutlined />}
-                onClick={() => navigate(record.actionPath)}>
-                {record.type === 'approve' ? '审批' : '执行'}
-              </Button>
-            </Tooltip>
-          )}
-        </Space>
-      ),
+      render: (_, record) => {
+        const isMine = record.assigneeUserId === currentUser?.id
+        if (record.status === 'cancelled') return null
+        return (
+          <Space size="small">
+            {isMine ? (
+              <Tooltip title={record.type === 'approve' ? '去审批' : '去执行'}>
+                <Button type="primary" size="small" icon={<PlayCircleOutlined />}
+                  onClick={() => navigate(record.actionPath)}>
+                  {record.type === 'approve' ? '审批' : '执行'}
+                </Button>
+              </Tooltip>
+            ) : (
+              <Tooltip title="仅查看（非本人任务）">
+                <Button size="small" icon={<EyeOutlined />}
+                  onClick={() => navigate(record.actionPath)}>
+                  查看
+                </Button>
+              </Tooltip>
+            )}
+          </Space>
+        )
+      },
     },
   ]
 
@@ -221,7 +261,8 @@ const MyTasksPage: React.FC = () => {
     const lane = getBoardLane(task)
     const taskStatus = statusMap[task.status] || { color: 'default', label: task.status }
     const nodeStatus = nodeStatusMap[task.nodeStatus] || { color: 'default', label: task.nodeStatus }
-    const isDraggingEnabled = ['pending', 'in_progress'].includes(lane)
+    const isMine = task.assigneeUserId === currentUser?.id
+    const isDraggingEnabled = isMine && ['pending', 'in_progress'].includes(lane)
     const isDragging = draggingTaskId === task.id
 
     return (
@@ -305,6 +346,16 @@ const MyTasksPage: React.FC = () => {
             <div style={{ height: '100%', width: `${task.percentComplete}%`, borderRadius: 99, background: `linear-gradient(90deg, ${laneAccent}bb, ${laneAccent})`, transition: 'width 0.4s ease' }} />
           </div>
         </div>
+        {/* 执行人 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+          <Avatar size={16} icon={<UserOutlined />} style={{ background: isMine ? laneAccent : '#8c8c8c', flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: isMine ? laneAccent : '#8e8e93', fontWeight: 600 }}>
+            {task.assigneeName ?? '未分配'}
+          </span>
+          {!isMine && (
+            <span style={{ fontSize: 10, color: '#bfbfbf', background: '#f5f5f5', padding: '1px 6px', borderRadius: 99, marginLeft: 2 }}>只读</span>
+          )}
+        </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <span style={{ fontSize: 11, color: '#aeaeb2' }}>
             {new Date(task.createdAt).toLocaleDateString('zh-CN')}
@@ -322,15 +373,17 @@ const MyTasksPage: React.FC = () => {
             onClick={() => navigate(task.actionPath)}
             style={{
               flex: 1,
-              background: `linear-gradient(135deg, ${laneAccent}dd 0%, ${laneAccent} 100%)`,
+              background: isMine
+                ? `linear-gradient(135deg, ${laneAccent}dd 0%, ${laneAccent} 100%)`
+                : 'rgba(0,0,0,0.06)',
               border: 'none',
               borderRadius: 12,
               padding: '8px 12px',
               fontSize: 13,
               fontWeight: 700,
-              color: '#fff',
+              color: isMine ? '#fff' : '#595959',
               cursor: 'pointer',
-              boxShadow: `0 4px 14px ${laneAccent}44`,
+              boxShadow: isMine ? `0 4px 14px ${laneAccent}44` : 'none',
               letterSpacing: '-0.01em',
               display: 'flex',
               alignItems: 'center',
@@ -338,7 +391,7 @@ const MyTasksPage: React.FC = () => {
               gap: 5,
             }}
           >
-            {task.type === 'approve' ? '进入审批' : '打开任务'}
+            {isMine ? (task.type === 'approve' ? '进入审批' : '打开任务') : '查看详情'}
           </button>
           <button
             onClick={() => navigate(`/instances/${task.processInstanceId}`)}
@@ -374,6 +427,10 @@ const MyTasksPage: React.FC = () => {
               { label: '列表', value: 'list' },
             ]}
           />
+          <Select placeholder="执行人" allowClear style={{ width: 100 }}
+            value={filterAssignee}
+            onChange={(v) => setFilterAssignee(v)}
+            options={assigneeOptions} />
           <Select placeholder="任务类型" allowClear style={{ width: 100 }}
             value={filterType}
             onChange={(v) => setFilterType(v)}
@@ -402,10 +459,10 @@ const MyTasksPage: React.FC = () => {
         padding: '0 2px',
       }}>
         {[
-          { title: '当前页任务', value: summary.total, color: '#4F8CFF', bg: 'linear-gradient(135deg, #fafdff 0%, #e3f0ff 100%)', shadow: '0 8px 32px #4f8cff22' },
-          { title: '活跃任务', value: summary.active, color: '#34C759', bg: 'linear-gradient(135deg, #fafdff 0%, #e6fff3 100%)', shadow: '0 8px 32px #34c75922' },
-          { title: '待审批', value: summary.waitingApproval, color: '#FFB800', bg: 'linear-gradient(135deg, #fffbe6 0%, #fff7e6 100%)', shadow: '0 8px 32px #ffb80022' },
-          { title: '已完成', value: summary.completed, color: '#5856D6', bg: 'linear-gradient(135deg, #f7f6fd 0%, #eae6ff 100%)', shadow: '0 8px 32px #5856d622' },
+          { title: '待执行', value: summary.pending,     color: '#8c8c8c', bg: 'linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)', shadow: '0 8px 32px #8c8c8c22' },
+          { title: '执行中',   value: summary.in_progress, color: '#4F8CFF', bg: 'linear-gradient(135deg, #fafdff 0%, #e3f0ff 100%)', shadow: '0 8px 32px #4f8cff22' },
+          { title: '已完成',   value: summary.completed,   color: '#34C759', bg: 'linear-gradient(135deg, #fafdff 0%, #e6fff3 100%)', shadow: '0 8px 32px #34c75922' },
+          { title: '已取消',   value: summary.cancelled,   color: '#bfbfbf', bg: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)', shadow: '0 8px 32px #bfbfbf22' },
         ].map((stat) => (
           <div key={stat.title} style={{
             background: stat.bg,
@@ -441,10 +498,10 @@ const MyTasksPage: React.FC = () => {
       </div>
 
       {viewMode === 'board' ? (
-        data.length === 0 ? (
+        filteredData.length === 0 ? (
           <Empty description="当前筛选条件下暂无任务" />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, alignItems: 'start' }}>
             {boardColumns.map((column) => {
               const items = laneBuckets[column.key]
               return (
@@ -521,7 +578,7 @@ const MyTasksPage: React.FC = () => {
           </div>
         )
       ) : (
-        <Table rowKey="id" columns={columns} dataSource={data} loading={loading}
+        <Table rowKey="id" columns={columns} dataSource={filteredData} loading={loading}
           pagination={{
             ...pagination,
             showSizeChanger: true,

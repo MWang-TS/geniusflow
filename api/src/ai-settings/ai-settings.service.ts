@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException, ConflictException, HttpException, HttpStatus } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import * as https from 'https'
+import * as http from 'http'
+import * as dns from 'dns'
 import {
   CreateProviderDto,
   UpdateProviderDto,
@@ -81,23 +84,36 @@ export class AiSettingsService {
       return { ok: false, error: 'API Key 未配置' }
     }
 
-    const baseUrl = provider.baseUrl ?? this.defaultBaseUrl(provider.type as string)
+    const baseUrl = (provider.baseUrl ?? this.defaultBaseUrl(provider.type as string)).replace(/\/$/, '')
+    const authHeader: Record<string, string> = provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}
     const start = Date.now()
-    try {
-      const url = `${baseUrl.replace(/\/$/, '')}/models`
-      const resp = await fetch(url, {
-        headers: provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {},
-        signal: AbortSignal.timeout(8000),
-      })
-      const latencyMs = Date.now() - start
-      if (resp.ok || resp.status === 401) {
-        // 401 means API key is wrong but endpoint is reachable; we treat that as connectivity OK
-        return { ok: resp.ok, latencyMs, error: resp.ok ? undefined : `HTTP ${resp.status} — API Key 无效` }
+
+    const endpoints: Array<{ path: string; method?: string; body?: string }> = [
+      { path: '/models' },
+      { path: '/chat/completions', method: 'POST',
+        body: JSON.stringify({ model: 'gpt-3.5-turbo', messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 }) },
+    ]
+
+    let lastError = ''
+    for (const ep of endpoints) {
+      try {
+        const { status } = await this.ipv4Request(baseUrl, ep.path, {
+          method: ep.method,
+          headers: authHeader,
+          body: ep.body,
+          timeoutMs: 10000,
+        })
+        const latencyMs = Date.now() - start
+        if (status === 200 || status === 401 || status === 403) {
+          return { ok: status === 200, latencyMs, error: status === 200 ? undefined : `HTTP ${status} — API Key 无效或权限不足` }
+        }
+        if (status === 404) { lastError = `HTTP 404`; continue }
+        return { ok: false, latencyMs, error: `HTTP ${status}` }
+      } catch (e: unknown) {
+        lastError = (e as Error).message
       }
-      return { ok: false, latencyMs, error: `HTTP ${resp.status}` }
-    } catch (e: unknown) {
-      return { ok: false, latencyMs: Date.now() - start, error: (e as Error).message }
     }
+    return { ok: false, latencyMs: Date.now() - start, error: lastError }
   }
 
   async fetchProviderModels(id: string): Promise<{ models: string[] }> {
@@ -122,15 +138,16 @@ export class AiSettingsService {
     }
 
     const baseUrl = (provider.baseUrl ?? this.defaultBaseUrl(provider.type as string)).replace(/\/$/, '')
+    const authHeader: Record<string, string> = provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}
     try {
-      const resp = await fetch(`${baseUrl}/models`, {
-        headers: provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {},
-        signal: AbortSignal.timeout(10000),
+      const { status, body } = await this.ipv4Request(baseUrl, '/models', {
+        headers: authHeader,
+        timeoutMs: 10000,
       })
-      if (!resp.ok) {
-        throw new HttpException(`提供商返回错误: HTTP ${resp.status}`, HttpStatus.BAD_GATEWAY)
+      if (status !== 200) {
+        throw new HttpException(`提供商返回错误: HTTP ${status}`, HttpStatus.BAD_GATEWAY)
       }
-      const json = (await resp.json()) as Record<string, unknown>
+      const json = JSON.parse(body) as Record<string, unknown>
 
       // OpenAI-compatible format: { data: [{ id, ... }] }
       if (Array.isArray(json.data)) {
@@ -155,6 +172,57 @@ export class AiSettingsService {
       if (e instanceof HttpException) throw e
       throw new HttpException(`获取模型列表失败: ${(e as Error).message}`, HttpStatus.BAD_GATEWAY)
     }
+  }
+
+  /** 强制 IPv4 的 HTTP/HTTPS 请求，避免 Docker 容器 IPv6 不通的问题 */
+  private ipv4Request(
+    baseUrl: string,
+    path: string,
+    opts: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number } = {},
+  ): Promise<{ status: number; body: string }> {
+    return new Promise((resolve, reject) => {
+      const parsed = new URL(baseUrl + path)
+      const isHttps = parsed.protocol === 'https:'
+      const mod = isHttps ? https : http
+      const { method = 'GET', headers = {}, body, timeoutMs = 10000 } = opts
+
+      const doConnect = (addr: string) => {
+        const extraHeaders: Record<string, string> = body
+          ? { 'Content-Type': 'application/json', 'Content-Length': String(Buffer.byteLength(body)) }
+          : {}
+        const req = mod.request(
+          {
+            host: addr,
+            port: Number(parsed.port) || (isHttps ? 443 : 80),
+            path: parsed.pathname + parsed.search,
+            method,
+            headers: { Host: parsed.hostname, ...headers, ...extraHeaders },
+            servername: parsed.hostname,
+            timeout: timeoutMs,
+          },
+          (res) => {
+            const chunks: Buffer[] = []
+            res.on('data', (d: Buffer) => chunks.push(d))
+            res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString() }))
+          },
+        )
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')) })
+        req.on('error', reject)
+        if (body) req.write(body)
+        req.end()
+      }
+
+      dns.resolve4(parsed.hostname, (err, addrs) => {
+        if (err || !addrs?.length) {
+          dns.lookup(parsed.hostname, { family: 4 }, (err2, addr) => {
+            if (err2) return reject(err2)
+            doConnect(addr)
+          })
+        } else {
+          doConnect(addrs[0])
+        }
+      })
+    })
   }
 
   private defaultBaseUrl(type: string): string {

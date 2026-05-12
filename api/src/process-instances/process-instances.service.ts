@@ -52,6 +52,13 @@ export class ProcessInstancesService {
       },
     })
 
+    // 找到第一个有执行人的节点索引；开始/结束等无执行人的节点自动跳过
+    const firstAssigneeIndex = definition.nodes.findIndex(
+      (n) => !!(dto.nodeAssignees?.[n.id]?.assigneeUserId),
+    )
+    // 如果没有任何节点有执行人，从 0 开始（流程将全部自动完成）
+    const effectiveFirstIndex = firstAssigneeIndex >= 0 ? firstAssigneeIndex : 0
+
     let cumulativeDays = 0
     const nodeInstances: Array<{
       nodeDefId: string
@@ -64,7 +71,6 @@ export class ProcessInstancesService {
     for (let i = 0; i < definition.nodes.length; i++) {
       const nodeDef = definition.nodes[i]
       const assigneeConfig = dto.nodeAssignees?.[nodeDef.id]
-      const isFirst = i === 0
 
       const assigneeUserId = assigneeConfig?.assigneeUserId || null
 
@@ -76,19 +82,30 @@ export class ProcessInstancesService {
       const nodePlannedEnd = new Date(nodePlannedStart)
       nodePlannedEnd.setDate(nodePlannedEnd.getDate() + duration)
 
+      // 无执行人且在第一个有执行人节点之前的节点 → 自动完成（跳过）
+      let status: string
+      if (i < effectiveFirstIndex) {
+        status = 'completed'
+      } else if (i === effectiveFirstIndex) {
+        status = 'in_progress'
+      } else {
+        status = 'waiting'
+      }
+
       nodeInstances.push({
         nodeDefId: nodeDef.id,
         assigneeUserId,
         plannedStart: nodePlannedStart,
         plannedEnd: nodePlannedEnd,
-        status: isFirst ? 'in_progress' : 'waiting',
+        status,
       })
 
       cumulativeDays += duration
     }
 
     const createdNodes = []
-    for (const ni of nodeInstances) {
+    for (let i = 0; i < nodeInstances.length; i++) {
+      const ni = nodeInstances[i]
       const created = await this.prisma.nodeInstance.create({
         data: {
           instanceId: instance.id,
@@ -97,6 +114,7 @@ export class ProcessInstancesService {
           plannedStartDate: ni.plannedStart,
           plannedEndDate: ni.plannedEnd,
           assigneeUserId: ni.assigneeUserId,
+          ...(ni.status === 'completed' ? { actualStartDate: new Date(), actualEndDate: new Date() } : {}),
         },
         include: { definition: true },
       })
@@ -105,26 +123,27 @@ export class ProcessInstancesService {
       await this.prisma.nodeInstanceHistory.create({
         data: {
           nodeInstanceId: created.id,
-          eventType: 'create',
+          eventType: i < effectiveFirstIndex ? 'auto_complete' : 'create',
           toStatus: ni.status,
         },
       })
     }
 
-    const firstNode = createdNodes[0]
-    if (firstNode) {
+    // currentNodeId 指向第一个 in_progress 节点
+    const firstActiveNode = createdNodes[effectiveFirstIndex] ?? createdNodes[0]
+    if (firstActiveNode) {
       await this.prisma.processInstance.update({
         where: { id: instance.id },
-        data: { currentNodeId: firstNode.id },
+        data: { currentNodeId: firstActiveNode.id },
       })
     }
 
-    if (firstNode && firstNode.assigneeUserId) {
-      const plannedEnd = firstNode.plannedEndDate
+    if (firstActiveNode && firstActiveNode.assigneeUserId) {
+      const plannedEnd = firstActiveNode.plannedEndDate
       await this.prisma.task.create({
         data: {
-          nodeInstanceId: firstNode.id,
-          assigneeUserId: firstNode.assigneeUserId,
+          nodeInstanceId: firstActiveNode.id,
+          assigneeUserId: firstActiveNode.assigneeUserId,
           type: 'execute',
           status: 'pending',
           dueDate: plannedEnd || undefined,
@@ -132,10 +151,10 @@ export class ProcessInstancesService {
       })
       // 从任务定义生成子任务
       await this.taskDefinitionsService.spawnSubTasksForNodeInstance(
-        firstNode.id,
-        firstNode.definition.id,
-        firstNode.assigneeUserId,
-        firstNode.plannedEndDate,
+        firstActiveNode.id,
+        firstActiveNode.definition.id,
+        firstActiveNode.assigneeUserId,
+        firstActiveNode.plannedEndDate,
       )
     }
 

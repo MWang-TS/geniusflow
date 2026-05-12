@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { Response } from 'express'
+import * as https from 'https'
+import * as http from 'http'
 
 interface Message {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -309,72 +311,110 @@ export class AiAssistantService {
       ? `${baseUrl}/messages`
       : `${baseUrl}/chat/completions`
 
-    let response: globalThis.Response
+    let statusCode = 0
+    let errorText = ''
+    let responseStream: NodeJS.ReadableStream | null = null
     try {
-      response = await fetch(chatUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(60000),
+      const parsed = new URL(chatUrl)
+      const transport = parsed.protocol === 'https:' ? https : http
+      const payload = JSON.stringify(body)
+
+      const result = await new Promise<{ statusCode: number; errorText: string; stream: NodeJS.ReadableStream | null }>((resolve, reject) => {
+        const req = transport.request({
+          protocol: parsed.protocol,
+          hostname: parsed.hostname,
+          port: parsed.port ? Number(parsed.port) : (parsed.protocol === 'https:' ? 443 : 80),
+          path: `${parsed.pathname}${parsed.search}`,
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Length': Buffer.byteLength(payload).toString(),
+          },
+          family: 4,
+          timeout: 60000,
+        }, (upstreamRes) => {
+          const code = upstreamRes.statusCode ?? 0
+          if (code >= 200 && code < 300) {
+            resolve({ statusCode: code, errorText: '', stream: upstreamRes })
+            return
+          }
+          let errBody = ''
+          upstreamRes.on('data', (chunk) => {
+            errBody += chunk.toString()
+          })
+          upstreamRes.on('end', () => {
+            resolve({ statusCode: code, errorText: errBody, stream: null })
+          })
+        })
+
+        req.on('timeout', () => req.destroy(new Error('timeout')))
+        req.on('error', reject)
+        req.write(payload)
+        req.end()
       })
+
+      statusCode = result.statusCode
+      errorText = result.errorText
+      responseStream = result.stream
     } catch (e: unknown) {
       res.write(`data: ${JSON.stringify({ type: 'error', content: `AI服务连接失败: ${(e as Error).message}` })}\n\n`)
       res.end()
       return
     }
 
-    if (!response.ok) {
-      const err = await response.text()
-      res.write(`data: ${JSON.stringify({ type: 'error', content: `AI返回错误: HTTP ${response.status}` })}\n\n`)
+    if (statusCode < 200 || statusCode >= 300 || !responseStream) {
+      const detail = errorText ? `，${errorText.slice(0, 200)}` : ''
+      res.write(`data: ${JSON.stringify({ type: 'error', content: `AI返回错误: HTTP ${statusCode}${detail}` })}\n\n`)
       res.end()
       return
     }
 
     // Stream and collect tool calls
-    const reader = response.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     let fullContent = ''
     const pendingToolCalls: Record<string, { id: string; name: string; args: string }> = {}
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
+    await new Promise<void>((resolve, reject) => {
+      responseStream!.on('data', (value: Buffer) => {
+        buffer += decoder.decode(value, { stream: true })
 
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const data = line.slice(6).trim()
-        if (data === '[DONE]') continue
-        try {
-          const chunk = JSON.parse(data)
-          const delta = chunk.choices?.[0]?.delta
-          if (!delta) continue
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+          try {
+            const chunk = JSON.parse(data)
+            const delta = chunk.choices?.[0]?.delta
+            if (!delta) continue
 
-          if (delta.content) {
-            fullContent += delta.content
-            res.write(`data: ${JSON.stringify({ type: 'text', content: delta.content })}\n\n`)
-          }
-
-          if (delta.tool_calls) {
-            for (const tc of delta.tool_calls) {
-              const idx = tc.index ?? 0
-              if (!pendingToolCalls[idx]) {
-                pendingToolCalls[idx] = { id: tc.id || '', name: '', args: '' }
-              }
-              if (tc.id) pendingToolCalls[idx].id = tc.id
-              if (tc.function?.name) pendingToolCalls[idx].name += tc.function.name
-              if (tc.function?.arguments) pendingToolCalls[idx].args += tc.function.arguments
+            if (delta.content) {
+              fullContent += delta.content
+              res.write(`data: ${JSON.stringify({ type: 'text', content: delta.content })}\n\n`)
             }
+
+            if (delta.tool_calls) {
+              for (const tc of delta.tool_calls) {
+                const idx = tc.index ?? 0
+                if (!pendingToolCalls[idx]) {
+                  pendingToolCalls[idx] = { id: tc.id || '', name: '', args: '' }
+                }
+                if (tc.id) pendingToolCalls[idx].id = tc.id
+                if (tc.function?.name) pendingToolCalls[idx].name += tc.function.name
+                if (tc.function?.arguments) pendingToolCalls[idx].args += tc.function.arguments
+              }
+            }
+          } catch {
+            // skip malformed chunks
           }
-        } catch {
-          // skip malformed chunks
         }
-      }
-    }
+      })
+      responseStream!.on('end', () => resolve())
+      responseStream!.on('error', reject)
+    })
 
     const toolCalls = Object.values(pendingToolCalls).filter((t) => t.name)
     if (toolCalls.length === 0) {

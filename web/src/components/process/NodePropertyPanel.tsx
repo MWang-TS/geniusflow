@@ -143,6 +143,10 @@ const NodePropertyPanel: React.FC<NodePropertyPanelProps> = ({ readOnly = false 
   const [localChecklist, setLocalChecklist] = useState<ChecklistItem[]>([])
 
   const node = currentProcess?.nodes?.find((n) => n.id === selectedNodeId)
+  // 从 graphJson 获取节点的基本信息（画布上的节点，可能还未持久化到 NodeDefinition）
+  const graphNode = selectedNodeId
+    ? currentProcess?.graphJson?.nodes?.find((n) => n.id === selectedNodeId)
+    : null
 
   useEffect(() => {
     knowledgeBaseApi.list({ page: 1, pageSize: 100 }).then((r) => {
@@ -246,8 +250,28 @@ const NodePropertyPanel: React.FC<NodePropertyPanelProps> = ({ readOnly = false 
   )
 
   // 未选中节点时显示流程级 AI 设置
-  if (!node) {
+  if (!selectedNodeId) {
     return <ProcessAiSettingsPanel readOnly={readOnly} kbList={kbList} />
+  }
+
+  // 节点已选中但 NodeDefinition 还未持久化（需要先保存草稿）
+  if (!node) {
+    const isStartEnd = graphNode?.type === 'start' || graphNode?.type === 'end'
+    const label = (graphNode?.data as any)?.label || graphNode?.type || '节点'
+    return (
+      <Card size="small" title={label} style={{ height: '100%' }}>
+        <div style={{ padding: '16px 0', color: '#8c8c8c', fontSize: 13, textAlign: 'center' }}>
+          {isStartEnd ? (
+            <span>开始/结束节点无需配置属性</span>
+          ) : (
+            <>
+              <div style={{ marginBottom: 8 }}>该节点尚未保存</div>
+              <div style={{ marginBottom: 16, fontSize: 12 }}>请先点击「保存草稿」再编辑节点属性</div>
+            </>
+          )}
+        </div>
+      </Card>
+    )
   }
 
   const isStartOrEnd = node.nodeType === 'start' || node.nodeType === 'end'

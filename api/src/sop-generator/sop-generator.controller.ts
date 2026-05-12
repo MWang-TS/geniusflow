@@ -5,8 +5,12 @@ import {
   Req,
   Res,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   ValidationPipe,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { Request, Response } from 'express'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/roles.guard'
@@ -36,6 +40,16 @@ export class SopGeneratorController {
     res.flushHeaders()
 
     await this.service.streamGenerate(dto, res)
+  }
+
+  /**
+   * Extract plain text from an uploaded document (txt/md/pdf/docx).
+   */
+  @Post('extract-doc')
+  @Roles('designer', 'admin')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async extractDoc(@UploadedFile() file: any) {
+    return this.service.extractDoc(file)
   }
 
   /**

@@ -181,7 +181,7 @@ model Task {
 
   nodeInstance NodeInstance    @relation(fields: [nodeInstanceId], references: [id], onDelete: Cascade)
   assignee     User            @relation(fields: [assigneeUserId], references: [id])
-  taskDef      TaskDefinition? @relation(fields: [taskDefId], references: [id])
+  taskDef      TaskDefinition? @relation(fields: [taskDefId], references: [id], onDelete: SetNull)
 
   @@map("tasks")
 }

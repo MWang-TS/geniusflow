@@ -132,15 +132,10 @@ export class ProcessDefinitionsService {
       throw new ConflictException('已发布的流程不能删除，请先停止')
     }
 
-    // 检查是否存在关联的流程实例
-    const instanceCount = await this.prisma.processInstance.count({
+    // 先删除关联的流程实例（NodeInstance 及其子表会级联删除）
+    await this.prisma.processInstance.deleteMany({
       where: { definitionId: id },
     })
-    if (instanceCount > 0) {
-      throw new ConflictException(
-        `该流程已有 ${instanceCount} 条运行记录，无法删除。如需清理，请联系管理员。`,
-      )
-    }
 
     await this.prisma.processDefinition.delete({ where: { id } })
     return { success: true }
@@ -246,7 +241,7 @@ export class ProcessDefinitionsService {
 
   private async syncNodeDefinitions(
     processId: string,
-    graphJson: { nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data?: { label?: string } }> },
+    graphJson: { nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data?: { label?: string } }>; edges?: Array<{ id: string; source: string; target: string }> },
   ) {
     const graphNodeIds = graphJson.nodes.map((n) => n.id)
 
@@ -255,6 +250,7 @@ export class ProcessDefinitionsService {
     })
     const existingNodeIds = existingNodes.map((n) => n.id)
 
+    // 删除已从画布移除的节点
     const toDelete = existingNodes.filter((n) => !graphNodeIds.includes(n.id))
     if (toDelete.length > 0) {
       await this.prisma.nodeDefinition.deleteMany({
@@ -280,6 +276,7 @@ export class ProcessDefinitionsService {
       }
 
       if (existingNodeIds.includes(node.id)) {
+        // 已存在：更新位置/名称，保留用户已配置的内容
         const existing = existingNodes.find((n) => n.id === node.id)!
         await this.prisma.nodeDefinition.update({
           where: { id: node.id },
@@ -293,6 +290,7 @@ export class ProcessDefinitionsService {
           },
         })
       } else {
+        // 新节点：ID 已包含流程前缀，直接创建
         await this.prisma.nodeDefinition.create({
           data: { id: node.id, ...upsertData },
         })

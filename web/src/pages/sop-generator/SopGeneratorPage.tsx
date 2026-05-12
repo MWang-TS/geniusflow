@@ -15,6 +15,8 @@ import {
   Divider,
   Badge,
   Card,
+  Upload,
+  Tooltip,
 } from 'antd'
 import {
   SendOutlined,
@@ -24,6 +26,8 @@ import {
   CloseCircleOutlined,
   RobotOutlined,
   NodeIndexOutlined,
+  UploadOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import {
   ReactFlow,
@@ -35,6 +39,8 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { streamGenerateSop, sopApi, type SopNode, type SopEdge } from '@/api/sop-generator'
+
+const ACCEPT_DOC_TYPES = '.txt,.md,.pdf,.docx'
 
 const { Sider, Content } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -105,6 +111,8 @@ const SopGeneratorPage: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [roleTag, setRoleTag] = useState('')
   const [roleTags, setRoleTags] = useState<string[]>([])
+  const [extracting, setExtracting] = useState(false)
+  const [docFileName, setDocFileName] = useState('')
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -202,6 +210,22 @@ const SopGeneratorPage: React.FC = () => {
     }
   }
 
+  const handleDocUpload = useCallback(async (file: File) => {
+    setExtracting(true)
+    setDocFileName(file.name)
+    try {
+      const result = await sopApi.extractDoc(file)
+      form.setFieldValue('description', result.text)
+      message.success(`已从「${file.name}」提取 ${result.length.toLocaleString()} 个字符`)
+    } catch (err: any) {
+      message.error(err?.message || '文档解析失败')
+      setDocFileName('')
+    } finally {
+      setExtracting(false)
+    }
+    return false // prevent antd auto-upload
+  }, [form, message])
+
   const addRoleTag = () => {
     const v = roleTag.trim()
     if (v && !roleTags.includes(v)) {
@@ -246,15 +270,45 @@ const SopGeneratorPage: React.FC = () => {
 
         <Form form={form} layout="vertical" size="small">
           <Form.Item
-            label="流程描述"
+            label={
+              <Space size={4}>
+                <span>流程描述</span>
+                <Tooltip title="支持直接粘贴长文本，或上传 txt / md / pdf / docx 文档自动提取内容">
+                  <Upload
+                    accept={ACCEPT_DOC_TYPES}
+                    showUploadList={false}
+                    beforeUpload={handleDocUpload}
+                  >
+                    <Button
+                      size="small"
+                      icon={extracting ? <Spin size="small" /> : <UploadOutlined />}
+                      disabled={extracting}
+                      style={{ fontSize: 12 }}
+                    >
+                      {extracting ? '解析中…' : '导入文档'}
+                    </Button>
+                  </Upload>
+                </Tooltip>
+                {docFileName && (
+                  <Tag
+                    icon={<FileTextOutlined />}
+                    color="blue"
+                    closable
+                    onClose={() => setDocFileName('')}
+                    style={{ fontSize: 11 }}
+                  >
+                    {docFileName}
+                  </Tag>
+                )}
+              </Space>
+            }
             name="description"
             rules={[{ required: true, message: '请描述业务场景' }, { min: 10, message: '描述至少10个字' }]}
           >
             <TextArea
-              placeholder="例如：从立项申请到项目交付的完整软件研发流程，需要覆盖需求分析、设计评审、开发测试和上线审批..."
-              rows={5}
-              showCount
-              maxLength={2000}
+              placeholder="粘贴业务场景描述，或点击「导入文档」上传 txt / md / pdf / docx 文件（支持上万字的复杂流程）"
+              rows={8}
+              style={{ fontSize: 12 }}
             />
           </Form.Item>
 

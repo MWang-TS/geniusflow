@@ -15,6 +15,8 @@ export interface TaskListItem {
   percentComplete: number
   dueDate: string | null
   createdAt: string
+  assigneeUserId: string
+  assigneeName: string | null
   actionPath: string
 }
 

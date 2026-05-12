@@ -13,6 +13,7 @@ import remarkGfm from 'remark-gfm'
 import { streamChat, type ChatMessage } from '../../api/ai-assistant'
 import { useAiAssistantStore } from '../../stores/ai-assistant.store'
 import { knowledgeBaseApi, type KnowledgeBaseItem } from '../../api/knowledge-base'
+import { useAuthStore } from '../../stores/auth.store'
 
 const { Text } = Typography
 
@@ -38,8 +39,16 @@ export default function AiAssistant() {
 
   const pendingMessage = useAiAssistantStore((s) => s.pendingMessage)
   const clearPending = useAiAssistantStore((s) => s.clearPending)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   // Ref so the effect can call the latest handleSend without stale closure
   const sendRef = useRef<((text: string) => Promise<void>) | null>(null)
+
+  // 退出登录时自动关闭对话框
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setOpen(false)
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     knowledgeBaseApi.list().then((res: any) => {

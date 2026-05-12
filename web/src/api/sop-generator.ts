@@ -104,4 +104,21 @@ export const sopApi = {
       '/sop/save',
       data,
     ),
+
+  extractDoc: async (file: File): Promise<{ text: string; length: number }> => {
+    const token = getToken()
+    const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
+    const form = new FormData()
+    form.append('file', file)
+    const resp = await fetch(`${baseURL}/sop/extract-doc`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ message: '文档解析失败' }))
+      throw new Error(err?.message || '文档解析失败')
+    }
+    return resp.json()
+  },
 }

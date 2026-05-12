@@ -56,6 +56,27 @@ export class SopGeneratorService {
   }
 
   /**
+   * Proxy file to AI service for text extraction (txt/md/pdf/docx).
+   */
+  async extractDoc(file: { originalname: string; buffer: Buffer; mimetype: string }) {
+    if (!file) {
+      throw new BadRequestException('请上传文件')
+    }
+    const aiUrl = `${this.aiServiceUrl}/ai/sop/extract-text`
+
+    const form = new FormData()
+    const blob = new Blob([new Uint8Array(file.buffer)], { type: file.mimetype })
+    form.append('file', blob, file.originalname)
+
+    const resp = await fetch(aiUrl, { method: 'POST', body: form })
+    if (!resp.ok) {
+      const err = await resp.text()
+      throw new BadRequestException(`文档提取失败：${err}`)
+    }
+    return resp.json()
+  }
+
+  /**
    * Save the generated SOP as a ProcessDefinition draft with NodeDefinitions.
    */
   async saveSop(dto: SaveSopDto, userId: string) {
@@ -65,9 +86,41 @@ export class SopGeneratorService {
       throw new BadRequestException('节点列表不能为空')
     }
 
-    // Build ReactFlow-compatible graphJson
+    // Ensure unique name for the draft
+    const existing = await this.prisma.processDefinition.findFirst({
+      where: { name: processName, status: 'draft' },
+    })
+    const finalName = existing ? `${processName}（AI生成）` : processName
+
+    // 先创建 ProcessDefinition 拿到 ID，再用 ID 前缀重映射节点 ID
+    const definition = await this.prisma.processDefinition.create({
+      data: {
+        name: finalName,
+        graphJson: { nodes: [], edges: [] } as any, // 占位，后面更新
+        status: 'draft',
+        version: 1,
+        description: dto.description ?? null,
+        createdBy: userId,
+      },
+    })
+
+    // 用流程 ID 前 8 位作为前缀，将 AI 生成的 node_1、node_2 重映射为唯一 ID
+    const prefix = definition.id.replace(/-/g, '').slice(0, 8)
+    const idRemap = new Map<string, string>()
+    nodes.forEach((n, idx) => {
+      idRemap.set(n.id, `${prefix}_node_${idx + 1}`)
+    })
+
+    const remappedNodes = nodes.map((n) => ({ ...n, id: idRemap.get(n.id)! }))
+    const remappedEdges = edges.map((e) => ({
+      ...e,
+      source: idRemap.get(e.source) ?? e.source,
+      target: idRemap.get(e.target) ?? e.target,
+    }))
+
+    // Build ReactFlow-compatible graphJson with remapped IDs
     const graphJson = {
-      nodes: nodes.map((n) => ({
+      nodes: remappedNodes.map((n) => ({
         id: n.id,
         type: n.type,
         position: n.position,
@@ -90,33 +143,21 @@ export class SopGeneratorService {
           })),
         },
       })),
-      edges: edges.map((e) => ({
+      edges: remappedEdges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
       })),
     }
 
-    // Ensure unique name for the draft
-    const existing = await this.prisma.processDefinition.findFirst({
-      where: { name: processName, status: 'draft' },
+    // 更新 graphJson
+    await this.prisma.processDefinition.update({
+      where: { id: definition.id },
+      data: { graphJson: graphJson as any },
     })
 
-    const finalName = existing ? `${processName}（AI生成）` : processName
-
-    const definition = await this.prisma.processDefinition.create({
-      data: {
-        name: finalName,
-        graphJson: graphJson as any,
-        status: 'draft',
-        version: 1,
-        description: dto.description ?? null,
-        createdBy: userId,
-      },
-    })
-
-    // Sync NodeDefinitions
-    await this._syncNodeDefinitions(definition.id, nodes, edges)
+    // 创建 NodeDefinitions（ID 已包含流程前缀，不会与其他流程冲突）
+    await this._syncNodeDefinitions(definition.id, remappedNodes)
 
     await this.auditLog.record({
       userId,
@@ -132,12 +173,9 @@ export class SopGeneratorService {
   private async _syncNodeDefinitions(
     processId: string,
     nodes: SaveSopDto['nodes'],
-    edges: SaveSopDto['edges'],
   ) {
-    const taskNodes = nodes.filter((n) => n.type === 'task' || n.type === 'approval')
-
-    const records = taskNodes.map((n, idx) => ({
-      id: n.id,
+    const records = nodes.map((n, idx) => ({
+      id: n.id, // ID 已包含流程前缀，全局唯一
       processId,
       nodeName: n.label,
       nodeType: n.type,
@@ -173,7 +211,7 @@ export class SopGeneratorService {
     }))
 
     if (records.length > 0) {
-      await this.prisma.nodeDefinition.createMany({ data: records, skipDuplicates: true })
+      await this.prisma.nodeDefinition.createMany({ data: records })
     }
   }
 }

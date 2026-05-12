@@ -5,12 +5,13 @@ Generates a complete standard operating procedure (SOP) flow definition
 from a natural-language description, streaming nodes one-by-one via SSE.
 """
 
+import io
 import json
 import logging
 import asyncio
 from typing import List, Optional
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.knowledge import build_chat_client
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class SopGenerateRequest(BaseModel):
-    description: str = Field(..., min_length=5, max_length=2000, description="业务场景描述")
+    description: str = Field(..., min_length=5, description="业务场景描述（无长度上限）")
     domain: str = Field(default="通用", description="业务领域，如：软件研发、市场营销、采购管理")
     roleHints: List[str] = Field(default=[], description="涉及的角色/岗位提示")
     estimatedSteps: int = Field(default=6, ge=3, le=15, description="期望的节点数量（含开始/结束）")
@@ -130,7 +131,7 @@ async def _stream_sop_events(request: SopGenerateRequest):
                 temperature=0.7,
                 response_format={"type": "json_object"},
             ),
-            timeout=60.0,
+            timeout=240.0,
         )
 
         result_text = response.choices[0].message.content
@@ -194,3 +195,50 @@ async def generate_sop(request: SopGenerateRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Text extraction from uploaded document
+# ---------------------------------------------------------------------------
+
+ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+
+
+async def _extract_text_from_file(file: UploadFile) -> str:
+    """Extract plain text from an uploaded txt/md/pdf/docx file."""
+    import os
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"不支持的文件格式 {ext}，请上传 txt / md / pdf / docx 文件",
+        )
+
+    content = await file.read()
+
+    if ext in (".txt", ".md"):
+        import chardet
+        detected = chardet.detect(content)
+        encoding = detected.get("encoding") or "utf-8"
+        return content.decode(encoding, errors="replace")
+
+    if ext == ".pdf":
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(content))
+        pages = [page.extract_text() or "" for page in reader.pages]
+        return "\n\n".join(pages)
+
+    if ext == ".docx":
+        from docx import Document
+        doc = Document(io.BytesIO(content))
+        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+        return "\n".join(paragraphs)
+
+    return ""
+
+
+@router.post("/sop/extract-text")
+async def extract_text(file: UploadFile = File(...)):
+    """Extract plain text from an uploaded txt / md / pdf / docx document."""
+    text = await _extract_text_from_file(file)
+    return JSONResponse({"text": text, "length": len(text)})

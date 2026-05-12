@@ -212,7 +212,9 @@ const ProcessCanvas: React.FC<ProcessCanvasProps> = ({ readOnly = false }) => {
       })
 
       const label = type === 'start' ? '开始' : type === 'end' ? '结束' : '新任务'
-      const newNodeId = `node-${Date.now()}`
+      // 节点 ID 包含流程 ID 前缀，确保跨流程全局唯一
+      const processPrefix = (currentProcess?.id ?? '').replace(/-/g, '').slice(0, 8)
+      const newNodeId = `${processPrefix}_${Date.now()}`
       const newNode: Node = {
         id: newNodeId,
         type,
