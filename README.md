@@ -16,6 +16,7 @@
 - [目录结构](#目录结构)
 - [环境变量](#环境变量)
 - [默认账号](#默认账号)
+- [服务器更新部署](#服务器更新部署)
 
 ---
 
@@ -103,13 +104,9 @@ cd geniusflow
 **2. 配置环境变量**
 
 ```bash
-# 主服务
-cp api/.env.example api/.env
-# 编辑 api/.env，填写数据库、Redis、JWT 密钥等
-
-# AI 服务
-cp ai-service/.env.example ai-service/.env
-# 编辑 ai-service/.env，填写 OPENAI_API_KEY 等
+# 根目录有 .env.example 供参考
+cp .env.example .env
+# 编辑 .env，按需填写 JWT_SECRET、OPENAI_API_KEY 等
 ```
 
 **3. 启动主服务（API）**
@@ -138,7 +135,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 5000
 ```
 
-> 前端默认访问 http://localhost:3000，API 端口 4001，AI 服务端口 5000。
+> 前端默认访问 http://localhost:3000，API 端口 4000（dev 代理到 4001，需在 api/.env 设置 `PORT=4001`），AI 服务端口 5000。
 
 ### Docker 部署
 
@@ -155,15 +152,16 @@ EOF
 **2. 构建并启动**
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 **3. 初始化数据库**
 
 ```bash
-docker-compose exec api npx prisma migrate deploy
-docker-compose exec api npx prisma db seed
+docker compose exec api npx prisma migrate deploy
 ```
+
+> `prisma db seed` 在生产镜像中无法直接运行（缺少 ts-node）。首次部署的默认账号初始化请参考[服务器更新部署 → 首次部署初始化账号](#首次部署初始化账号)。
 
 访问 http://localhost:8080（Nginx 默认映射 8080 端口）
 
@@ -268,6 +266,87 @@ REDIS_URL=redis://localhost:6379
 | 🔄 **流程任务模式** | 设计并执行业务流程，登录后默认进入任务看板，AI 辅助质检与审批 | `/my-tasks` |
 | 💬 **AI 助理模式** | 企业知识库对话助理，支持 Function Calling | `/skill-assistant` |
 | 🔑 **AI 中台模式** | 提供标准 API 接口，供内部平台集成使用 | `/api-platform` |
+
+---
+
+## 服务器更新部署
+
+以下流程适用于服务器上**无源码、仅运行镜像**的部署方式（即 docker-compose.yml 中使用 `image:` 而非 `build:`）。
+
+### 前提条件
+
+- 本地已安装 Docker
+- 服务器可通过 SSH 访问
+- 服务器上有 `/opt/geniusflow/docker-compose.yml`
+
+### 第一步：本地构建镜像
+
+```powershell
+cd /path/to/geniusflow
+
+# 构建三个应用镜像
+docker build -t geniusflow-api:latest ./api
+docker build -t geniusflow-web:latest ./web
+docker build -t geniusflow-ai-service:latest ./ai-service
+
+# 打包成单个 tar 文件
+docker save geniusflow-api:latest geniusflow-web:latest geniusflow-ai-service:latest -o geniusflow-images.tar
+```
+
+### 第二步：上传镜像到服务器
+
+```bash
+scp geniusflow-images.tar root@<服务器IP>:/opt/geniusflow/
+```
+
+### 第三步：服务器上加载镜像并重启容器
+
+SSH 登录服务器后执行：
+
+```bash
+cd /opt/geniusflow
+
+# 加载新镜像
+docker load -i geniusflow-images.tar
+
+# 重启应用容器（postgres/redis 不受影响，数据不会丢失）
+docker compose up -d
+
+# 如果 nginx 未自动重启，强制重建
+docker compose up -d --force-recreate nginx
+
+# 执行数据库迁移（有新迁移文件时才需要）
+docker exec geniusflow-api npx prisma migrate deploy
+
+# 清理 tar 文件
+rm geniusflow-images.tar
+```
+
+### 验证
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+docker compose logs -f api   # 查看 API 日志
+```
+
+访问 `http://<服务器IP>:8080` 确认服务正常。
+
+### 首次部署初始化账号
+
+若数据库中尚无账号（`prisma db seed` 无法在生产容器中直接运行），手动插入管理员：
+
+```bash
+docker exec -it geniusflow-postgres psql -U postgres -d geniusflow -c \
+"INSERT INTO users (id, name, email, password_hash, created_at, updated_at)
+VALUES (gen_random_uuid(), '系统管理员', 'admin@geniusflow.com',
+'\$2b\$10\$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+NOW(), NOW())
+ON CONFLICT (email) DO UPDATE SET password_hash = '\$2b\$10\$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';"
+```
+
+初始密码为 `password`，登录后请立即修改。
+
+> **注意**：每次更新时 nginx 容器因镜像未变不会自动重建，需手动 `--force-recreate`，否则可能因网络问题出现 502。
 
 ---
 
